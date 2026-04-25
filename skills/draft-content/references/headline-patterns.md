@@ -1,27 +1,34 @@
-# Headline and Hook Patterns
+# Headline and Hook Patterns (Echo Theory Labs)
 
-Use these when producing a blog title, LinkedIn/Twitter opener, email subject line, or landing-page hero line.
+Use for blog titles, Twitter/X opening hooks, and lead tweets. Echo's headlines are declarative or contrarian — they name a practice area, surface a failure mode, or assert a load-bearing claim. Generic listicle and how-to-without-obstacle formulas are out of register.
 
-## Headline formulas
+## Headline formulas (use these)
 
-- **How to [achieve result] without [common obstacle]** — "How to Double Your Email Open Rates Without Sending More Emails"
-- **[Number] [adjective] ways to [achieve result]** — "7 Proven Ways to Reduce Customer Churn"
-- **Why [common belief] is wrong (and what to do instead)** — "Why More Content Is Not the Answer (And What to Do Instead)"
-- **The [adjective] guide to [topic]** — "The Complete Guide to B2B Content Marketing"
-- **[Do this], not [that]** — "Build a Community, Not Just an Audience"
-- **What [impressive result] taught us about [topic]** — "What 10,000 A/B Tests Taught Us About Email Subject Lines"
-- **[topic]: what [audience] needs to know in [year]** — "SEO: What Marketers Need to Know in 2025"
+- **Naming a practice or discipline** — "Agent Harness Engineering, defined." / "Trajectory analysis is a discipline. We should name it."
+- **Naming a failure mode** — "Why most agent evaluation pipelines fail under production load." / "The silent drift problem in long-running agents."
+- **Contrarian-by-data** — "The agent reliability problem is not a model problem. The data shows where it is." / "Why offline evals miss the failures that ship."
+- **Load-bearing declarative claim** — "The engineering discipline to make agents production-grade barely exists." / "MCP servers are an AI supply chain dependency. Most teams treat them as trusted code."
+- **Methodology-note framing** — "How we run trajectory analysis on production agents." / "An audit checklist for MCP server hardening."
+- **Field-state assessment** — "The state of agent evaluation in 2026." / "Where production AI engineering breaks today."
 
-## Hook / opening-line formulas
+## Hook formulas for lead tweets and lead paragraphs (use these)
 
-- **Surprising statistic**: "73% of marketers say their biggest challenge is not budget — it is focus."
-- **Contrarian statement**: "The best marketing campaigns start with saying no to most channels."
-- **Question**: "When was the last time a marketing email actually changed what you bought?"
-- **Scenario**: "Imagine launching a campaign and knowing, before it goes live, which messages will land."
-- **Bold claim**: "Most landing pages lose half their visitors in the first three seconds."
-- **Story opening**: "Last quarter, our team was spending 20 hours a week on reporting. Here is what we did about it."
+- **Cited statistic** — "Over 40% of agentic AI projects will be cancelled by 2027 ([Gartner, June 2025](url)). The failure pattern is consistent..."
+- **Named failure mode** — "Silent output degradation following an upstream tool change is the single most common production agent failure we see..."
+- **Declarative load-bearing claim** — "The engineering discipline to make agents production-grade barely exists. We call the work to build it Applied Agentics."
+- **Contrarian-by-data** — "Most agent eval pipelines optimize for the wrong layer. Here is what trajectory analysis surfaces that they miss."
+
+## Forbidden formulas (do not use)
+
+- **Generic listicle** — "7 Ways to..." / "5 Things You Didn't Know About..." — out of register entirely.
+- **How-to-without-obstacle** — "How to Double Your Agent Reliability Without Hiring..." — collapses Echo into a marketing-blog frame.
+- **The [adjective] guide to [topic]** — "The Complete Guide to..." — too generalist; reads as SEO-bait, not research.
+- **What [impressive result] taught us about [topic]** — "What 10,000 agent runs taught us about..." — only acceptable if the number is real, the lesson is specific, and the claim is cited.
+- **Fake-personal story opener** — "Last quarter, our team was spending 20 hours a week on..." — explicitly forbidden by `brand/anti-patterns.md`.
+- **Marketing-puffery framing** — "The most advanced...", "The industry-leading...", "The #1...", any unqualified superlative — forbidden by `brand/anti-patterns.md`.
 
 ## When proposing options
 
-- Offer 2–3 variations spanning different formulas so the user can pick a register (data-led vs. contrarian vs. narrative).
-- For each option, note which formula it uses so the user can request more of that style.
+- Offer 2–3 variations spanning different declarative formulas (e.g., one practice-naming, one failure-mode, one contrarian-by-data) so the user can pick the angle.
+- For each option, note which formula it uses so the user can request more in that style.
+- Never propose a forbidden-formula variant, even as a contrast option.
