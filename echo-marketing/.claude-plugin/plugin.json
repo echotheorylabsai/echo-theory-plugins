@@ -6,5 +6,6 @@
     "name": "Echo Theory Labs",
     "email": "team@echotheory.ai"
   },
-  "keywords": ["marketing", "content", "brand", "echo-theory-labs"]
+  "keywords": ["marketing", "content", "brand", "echo-theory-labs"],
+  "license": "MIT"
 }

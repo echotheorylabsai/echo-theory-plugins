@@ -1,50 +1,73 @@
-# Marketing skills — generic pattern
+# Echo Theory Labs — Claude Code Plugin Marketplace
 
-A reusable two-skill pattern for brand-aware marketing content, driven by project-level brand config. Apply it to any company, client, or personal brand by filling in `brand/`.
+A public marketplace of [Claude Code plugins](https://docs.anthropic.com/en/docs/claude-code/plugins) built and maintained by [Echo Theory Labs](https://www.echotheory.ai). Each plugin packages a set of skills that extend Claude's behavior for specific workflows.
 
-## Structure
+---
+
+## Available Plugins
+
+| Plugin | Description |
+|---|---|
+| [`echo-marketing`](./echo-marketing/) | Brand-aware marketing skills: draft blog and Twitter/X content, review copy against brand guidelines, and author voice documents. |
+
+---
+
+## Installation
+
+### Add this marketplace to Claude Code
+
+```bash
+claude plugin marketplace add https://raw.githubusercontent.com/echo-theory-labs/claude-plugins/main/.claude-plugin/marketplace.json
+```
+
+### Install a plugin
+
+```bash
+# Project-scoped (recommended)
+claude plugin install echo-marketing --scope project
+
+# User-wide
+claude plugin install echo-marketing --scope user
+```
+
+### Session-local (no installation)
+
+```bash
+claude --plugin-dir /path/to/echo-marketing
+```
+
+---
+
+## Repository Layout
 
 ```
-<project-root>/
-├── brand/                      project config — single source of truth
-│   ├── voice.md                personality, attributes, pillars, tone
-│   └── style-guide.md          grammar, formatting, terminology
-└── skills/
-    ├── draft-content/          generate new marketing content
-    └── brand-review/           evaluate existing content + author voice doc
+echo-theory-plugins/
+├── .claude-plugin/
+│   └── marketplace.json        ← marketplace manifest
+├── echo-marketing/             ← installable plugin
+│   ├── .claude-plugin/
+│   │   └── plugin.json         ← plugin manifest
+│   ├── skills/                 ← skill definitions
+│   └── README.md
+├── brand/                      ← example brand config (Echo's own)
+├── evals/                      ← eval rubrics and test fixtures
+└── skills/                     ← skill source before packaging
 ```
 
-## The two skills
+**`brand/`** is Echo Theory Labs' own brand configuration, included as a working example. The `echo-marketing` skills expect a `brand/` directory in your project — copy and adapt this as a starting point.
 
-- **`draft-content`** — generates new content (blog, social, email, landing pages). Reads `brand/voice.md` and `brand/style-guide.md`; loads channel-specific references on demand.
-- **`brand-review`** — audits existing content against voice, style, and universal compliance flags. Also guides the user through authoring or revising `brand/voice.md` itself via `voice-doc-framework.md`.
+---
 
-Verbs are orthogonal: **create** vs. **evaluate**. The two skills never overlap.
+## Contributing
 
-## The `brand/` config
+Bug reports and skill improvements welcome. Open an issue or PR.
 
-Both skills read `brand/voice.md` and `brand/style-guide.md` as their source of truth. If missing, each skill offers to help author them. All brand customization happens here — the skill files themselves are company-agnostic.
+- Each plugin lives in its own top-level directory with a `.claude-plugin/plugin.json` manifest.
+- Skill source is in `skills/<skill-name>/SKILL.md`.
+- Eval rubrics live in `evals/rubrics/`; fixtures in `evals/fixtures/`.
 
-## Reusing the pattern
+---
 
-For a new company, client, or project:
+## License
 
-1. Copy `brand/`, `skills/draft-content/`, `skills/brand-review/` into the new project root.
-2. Fill out `brand/voice.md` (or ask `brand-review` to walk you through it).
-3. Override defaults in `brand/style-guide.md` as needed.
-4. Start drafting and reviewing — the skills will pick up the new config automatically.
-
-## Design commitments
-
-- **Progressive disclosure** — SKILL.md files stay thin; details live in `references/` and load only when needed.
-- **Single responsibility** — each skill owns one verb; `brand/` owns the data.
-- **No cross-skill dependencies** — both skills read `brand/`; neither imports from the other.
-- **skill-creator compatible** — frontmatter uses only validator-approved keys (`name`, `description`).
-- **Extensible** — new channels drop in as `skills/draft-content/references/channel-*.md`; industry-specific compliance can slot under `skills/brand-review/references/compliance-modules/` when needed.
-
-## Out of scope (for now)
-
-- `brand/personas.md`, `brand/facts.md`, `brand/context.md` — architecture accommodates them; add when you have content to populate them.
-- Voice variants (`brand/voice/*.md`) — add when a second voice use case appears.
-- Deterministic scripts (terminology checkers, readability scorers) — add when a fragile check shows up in practice.
-- Industry compliance modules — add under `skills/brand-review/references/compliance-modules/` per industry when needed.
+MIT — see [LICENSE](./LICENSE).

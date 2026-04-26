@@ -1,0 +1,15 @@
+{
+  "name": "echo-theory-plugins",
+  "owner": {
+    "name": "Echo Theory Labs",
+    "email": "team@echotheory.ai"
+  },
+  "license": "MIT",
+  "plugins": [
+    {
+      "name": "echo-marketing",
+      "source": "./echo-marketing",
+      "description": "Brand-aware marketing content skills: draft blog posts and Twitter/X content, review content against brand guidelines, and author brand voice documents."
+    }
+  ]
+}
