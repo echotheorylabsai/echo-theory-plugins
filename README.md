@@ -51,7 +51,7 @@ echo-theory-plugins/
 │   └── README.md
 ├── docs/
 │   └── brand/                      ← Echo's brand config (example for consumers)
-└── skills/
+└── skill-evals/
     ├── evals/                      ← eval rubrics and test fixtures
     ├── _trigger-evals/             ← trigger invocation eval configs and results
     └── body-evals-workspace/       ← body quality benchmark runs
@@ -67,7 +67,7 @@ Bug reports and skill improvements welcome. Open an issue or PR.
 
 - Each plugin lives in its own top-level directory with a `.claude-plugin/plugin.json` manifest.
 - Skill source is in `echo-marketing/skills/<skill-name>/SKILL.md`.
-- Eval rubrics live in `skills/evals/rubrics/`; fixtures in `skills/evals/fixtures/`.
+- Eval rubrics live in `skill-evals/evals/rubrics/`; fixtures in `skill-evals/evals/fixtures/`.
 
 ---
 

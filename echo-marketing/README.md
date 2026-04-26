@@ -198,6 +198,6 @@ Each skill lives in `skills/<skill-name>/`. The entry point is `SKILL.md`:
 - **Body** contains the workflow Claude follows. Keep it under ~500 lines; move heavy reference content into `references/`.
 - **`references/` files** are loaded on demand. Each `SKILL.md` step that needs a reference file calls it out explicitly.
 
-**Eval artifacts** for validating skill changes live at `../skills/_trigger-evals/` (trigger invocation tests) and `../skills/body-evals-workspace/` (body quality benchmarks). Run trigger evals after changing the `description` frontmatter; run body evals after changing the workflow.
+**Eval artifacts** for validating skill changes live at `../skill-evals/_trigger-evals/` (trigger invocation tests) and `../skill-evals/body-evals-workspace/` (body quality benchmarks). Run trigger evals after changing the `description` frontmatter; run body evals after changing the workflow.
 
 **Brand config** (`../brand/`) is out of scope for skill edits — changes there flow automatically to all skills at invocation time.

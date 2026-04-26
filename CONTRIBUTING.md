@@ -10,10 +10,10 @@ Thanks for your interest. Contributions are welcome — bug fixes, skill improve
 | `echo-marketing/skills/<skill>/SKILL.md` | Skill definition and workflow |
 | `echo-marketing/skills/<skill>/references/` | Reference files loaded on demand by the skill |
 | `docs/brand/` | Echo's brand config — copy and adapt for your own project |
-| `skills/evals/rubrics/` | Eval rubrics used to grade skill output quality |
-| `skills/evals/fixtures/` | Input fixtures for running evals |
-| `skills/_trigger-evals/` | Trigger invocation eval configs and run results |
-| `skills/body-evals-workspace/` | Body quality benchmark runs (before/after comparisons) |
+| `skill-evals/evals/rubrics/` | Eval rubrics used to grade skill output quality |
+| `skill-evals/evals/fixtures/` | Input fixtures for running evals |
+| `skill-evals/_trigger-evals/` | Trigger invocation eval configs and run results |
+| `skill-evals/body-evals-workspace/` | Body quality benchmark runs (before/after comparisons) |
 
 ## Making changes
 
@@ -22,7 +22,7 @@ Thanks for your interest. Contributions are welcome — bug fixes, skill improve
 1. Edit `echo-marketing/skills/<skill>/SKILL.md` (or a file in `references/`).
 2. If you changed the `description` frontmatter, run the trigger evals:
    ```bash
-   python skills/_trigger-evals/direct_eval.py
+   python skill-evals/_trigger-evals/direct_eval.py
    ```
 3. If you changed the skill body, run the body evals and include updated results in your PR.
 4. Open a PR with a clear description of what changed and why.
