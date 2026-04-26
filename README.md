@@ -17,7 +17,7 @@ A public marketplace of [Claude Code plugins](https://docs.anthropic.com/en/docs
 ### Add this marketplace to Claude Code
 
 ```bash
-claude plugin marketplace add https://raw.githubusercontent.com/echotheorylabsai/echo-theory-plugins/main/.claude-plugin/marketplace.json
+claude plugin marketplace add echotheorylabsai/echo-theory-plugins
 ```
 
 ### Install a plugin
