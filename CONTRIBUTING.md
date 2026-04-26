@@ -9,8 +9,9 @@ Thanks for your interest. Contributions are welcome — bug fixes, skill improve
 | `echo-marketing/` | The installable plugin (canonical artifact) |
 | `echo-marketing/skills/<skill>/SKILL.md` | Skill definition and workflow |
 | `echo-marketing/skills/<skill>/references/` | Reference files loaded on demand by the skill |
-| `brand/` | Echo Theory Labs' brand config — working example for plugin consumers |
-| `evals/` | Eval rubrics (`evals/rubrics/`) and test input fixtures (`evals/fixtures/`) |
+| `docs/brand/` | Echo's brand config — copy and adapt for your own project |
+| `skills/evals/rubrics/` | Eval rubrics used to grade skill output quality |
+| `skills/evals/fixtures/` | Input fixtures for running evals |
 | `skills/_trigger-evals/` | Trigger invocation eval configs and run results |
 | `skills/body-evals-workspace/` | Body quality benchmark runs (before/after comparisons) |
 

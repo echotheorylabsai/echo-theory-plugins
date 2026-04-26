@@ -34,7 +34,7 @@ Route to **Detailed findings** (with severity per `review-rubric.md`):
 
 ## Citation-specific flags (Echo)
 
-- **Stripped citations** — flag any statistic that lacks an inline citation in the form `([Publisher, Month YYYY](url))`. Recommend restoring the source from `echo-theory-labs-vision.md` if available; otherwise route to the user with `[citation needed]`.
+- **Stripped citations** — flag any statistic that lacks an inline citation in the form `([Publisher, Month YYYY](url))`. Route to the user with `[citation needed]` if the original source cannot be verified.
 - **Fabricated sources** — flag any source name that does not match a known publisher (Gartner, Deloitte, LangChain, peer-reviewed venues, primary documentation). If the source name appears invented (e.g., "Institute for Production AI Reliability" with no findable record), surface as **fabricated or unverifiable** with severity High and route to compliance.
 - **Naked numbers** — flag any percentage, dollar figure, or count claim without either a citation or an explicit "in our testing" / "in our engagements" qualifier.
 

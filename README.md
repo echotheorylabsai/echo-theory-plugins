@@ -17,7 +17,7 @@ A public marketplace of [Claude Code plugins](https://docs.anthropic.com/en/docs
 ### Add this marketplace to Claude Code
 
 ```bash
-claude plugin marketplace add https://raw.githubusercontent.com/echo-theory-labs/claude-plugins/main/.claude-plugin/marketplace.json
+claude plugin marketplace add https://raw.githubusercontent.com/echotheorylabsai/echo-theory-plugins/main/.claude-plugin/marketplace.json
 ```
 
 ### Install a plugin
@@ -43,18 +43,21 @@ claude --plugin-dir /path/to/echo-marketing
 ```
 echo-theory-plugins/
 ├── .claude-plugin/
-│   └── marketplace.json        ← marketplace manifest
-├── echo-marketing/             ← installable plugin
+│   └── marketplace.json            ← marketplace manifest
+├── echo-marketing/                 ← installable plugin
 │   ├── .claude-plugin/
-│   │   └── plugin.json         ← plugin manifest
-│   ├── skills/                 ← skill definitions
+│   │   └── plugin.json             ← plugin manifest
+│   ├── skills/                     ← skill definitions
 │   └── README.md
-├── brand/                      ← example brand config (Echo's own)
-├── evals/                      ← eval rubrics and test fixtures
-└── skills/                     ← skill source before packaging
+├── docs/
+│   └── brand/                      ← Echo's brand config (example for consumers)
+└── skills/
+    ├── evals/                      ← eval rubrics and test fixtures
+    ├── _trigger-evals/             ← trigger invocation eval configs and results
+    └── body-evals-workspace/       ← body quality benchmark runs
 ```
 
-**`brand/`** is Echo Theory Labs' own brand configuration, included as a working example. The `echo-marketing` skills expect a `brand/` directory in your project — copy and adapt this as a starting point.
+**`docs/brand/`** is Echo Theory Labs' own brand configuration, included as a working example. The `echo-marketing` skills expect a `brand/` directory in your project — copy and adapt `docs/brand/` as a starting point.
 
 ---
 
@@ -63,8 +66,8 @@ echo-theory-plugins/
 Bug reports and skill improvements welcome. Open an issue or PR.
 
 - Each plugin lives in its own top-level directory with a `.claude-plugin/plugin.json` manifest.
-- Skill source is in `skills/<skill-name>/SKILL.md`.
-- Eval rubrics live in `evals/rubrics/`; fixtures in `evals/fixtures/`.
+- Skill source is in `echo-marketing/skills/<skill-name>/SKILL.md`.
+- Eval rubrics live in `skills/evals/rubrics/`; fixtures in `skills/evals/fixtures/`.
 
 ---
 
