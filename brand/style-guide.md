@@ -44,7 +44,7 @@ The canonical capitalization and naming policy for Echo terms. The full position
 | Use this | Not this | Notes |
 |---|---|---|
 | *Applied Agentics* | "applied agentics", "applied AI" as a category claim | Always title-cased; this is Echo's core category framing |
-| *Agent Harness Engineering* | "context engineering", "harness engineering" | Title-cased. Supersedes "context engineering" entirely |
+| *Agent Harness Engineering* | "context engineering", "harness engineering", "Harness Engineering" | Title-cased. Always use the full form with "Agent"; supersedes "context engineering" entirely |
 | *Evaluation Engineering* | "eval engineering", "evals" as a discipline name | Title-cased pillar. "evals" is fine in body copy when referring to artifacts |
 | *Adversarial Defense* | "AI security", "agent security" as a pillar name | Title-cased pillar |
 | *Bare-Metal Orchestration* | "bare metal orchestration" (no hyphen) | Hyphenated, title-cased capability |

@@ -1,0 +1,1 @@
+cd /Users/shubh/Desktop/src/echo-skills && claude -p "i need a 1200-word blog post for echotheory.ai on why offline evals miss the failures that actually ship in production. audience is heads of AI engineering, evidence-led, has Gartner + LangChain stats. can you draft it?" --output-format text --model claude-sonnet-4-6 2>&1

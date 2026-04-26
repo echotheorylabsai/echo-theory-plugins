@@ -1,0 +1,1 @@
+cd /Users/shubh/Desktop/src/echo-skills && claude -p "we just got our positioning aligned with the founders and need to actually write the brand voice doc from scratch. can you walk me through it section by section so we end up with a real brand/voice.md instead of vibes?" --output-format text --model claude-sonnet-4-6 2>&1

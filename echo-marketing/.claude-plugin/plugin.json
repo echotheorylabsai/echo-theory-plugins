@@ -1,0 +1,10 @@
+{
+  "name": "echo-marketing",
+  "version": "1.0.0",
+  "description": "Echo Theory Labs marketing content skills: draft blog posts and Twitter/X content, review content against brand guidelines, and author brand voice documents.",
+  "author": {
+    "name": "Echo Theory Labs",
+    "email": "team@echotheory.ai"
+  },
+  "keywords": ["marketing", "content", "brand", "echo-theory-labs"]
+}

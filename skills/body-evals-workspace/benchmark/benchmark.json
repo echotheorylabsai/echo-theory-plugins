@@ -1,0 +1,403 @@
+{
+  "metadata": {
+    "skill_name": "echo-marketing-skills",
+    "skill_path": "<path/to/skill>",
+    "executor_model": "<model-name>",
+    "analyzer_model": "<model-name>",
+    "timestamp": "2026-04-26T15:56:54Z",
+    "evals_run": [
+      1,
+      2,
+      3
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 2,
+      "configuration": "old_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 9,
+        "failed": 0,
+        "total": 9,
+        "time_seconds": 151.5,
+        "tokens": 23031,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Output contains all 4 required sections: Summary, Detailed findings, Revised sections, Legal/compliance flags",
+          "passed": true,
+          "evidence": "All 4 sections present"
+        },
+        {
+          "text": "Detailed findings table uses severity labels (High/Medium/Low)",
+          "passed": true,
+          "evidence": "Severity labels present"
+        },
+        {
+          "text": "Flags We-are-excited anti-pattern",
+          "passed": true,
+          "evidence": "We're-excited anti-pattern flagged"
+        },
+        {
+          "text": "Flags hype superlatives (best-in-class, industry-leading, groundbreaking)",
+          "passed": true,
+          "evidence": "Hype superlatives flagged"
+        },
+        {
+          "text": "Flags exclamation marks as anti-pattern",
+          "passed": true,
+          "evidence": "Exclamation marks flagged"
+        },
+        {
+          "text": "Flags lead-gen CTA (sign up, free trial, book a demo) in legal or findings",
+          "passed": true,
+          "evidence": "Lead-gen CTA flagged"
+        },
+        {
+          "text": "Flags deprecated platform framing in favor of research lab positioning",
+          "passed": true,
+          "evidence": "Platform framing flagged"
+        },
+        {
+          "text": "Provides at least 3 before/after revisions for highest-severity issues",
+          "passed": true,
+          "evidence": "Before/after count: 5"
+        },
+        {
+          "text": "Flags persona mismatch (101-level language for expert audience)",
+          "passed": true,
+          "evidence": "Persona mismatch flagged"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "old_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 88.3,
+        "tokens": 17922,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Checks whether brand/voice.md already exists before proceeding",
+          "passed": true,
+          "evidence": "voice.md checked"
+        },
+        {
+          "text": "Lists all sections it will walk through (at least 5 of the 7 framework sections)",
+          "passed": true,
+          "evidence": "Section markers: 8"
+        },
+        {
+          "text": "Starts with Section 1 (Brand Personality) and prompts user with a question",
+          "passed": true,
+          "evidence": "Section 1 / question found"
+        },
+        {
+          "text": "Does NOT invent or fill in voice content without user input",
+          "passed": true,
+          "evidence": "Asks rather than fills in"
+        },
+        {
+          "text": "References the framework structure (not just generic questions)",
+          "passed": true,
+          "evidence": "Framework structure referenced"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "old_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 9,
+        "failed": 0,
+        "total": 9,
+        "time_seconds": 184.4,
+        "tokens": 21755,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Skill loads brand config before drafting (voice.md, facts.md, anti-patterns.md, style-guide.md)",
+          "passed": true,
+          "evidence": "Brand config load mentioned"
+        },
+        {
+          "text": "Identifies correct target persona (Production-AI CTO / heads of AI engineering)",
+          "passed": true,
+          "evidence": "Persona identified in response"
+        },
+        {
+          "text": "Produces at least 2 headline options",
+          "passed": true,
+          "evidence": "Headline-related markers found: 5"
+        },
+        {
+          "text": "Draft body exceeds 800 words",
+          "passed": true,
+          "evidence": "Word count: 1558"
+        },
+        {
+          "text": "Includes Gartner stat reference",
+          "passed": true,
+          "evidence": "Gartner reference found"
+        },
+        {
+          "text": "Includes LangChain stat reference",
+          "passed": true,
+          "evidence": "LangChain reference found"
+        },
+        {
+          "text": "CTA is research-distribution only \u2014 no lead-gen (no sign up / free trial / book a demo)",
+          "passed": true,
+          "evidence": "No lead-gen CTA found"
+        },
+        {
+          "text": "Uses named Echo pillar terminology (Evaluation Engineering, Agent Harness Engineering, etc.)",
+          "passed": true,
+          "evidence": "Echo pillar terminology used"
+        },
+        {
+          "text": "Provides SEO recommendations after the draft",
+          "passed": true,
+          "evidence": "SEO section found"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 9,
+        "failed": 0,
+        "total": 9,
+        "time_seconds": 89,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Output contains all 4 required sections: Summary, Detailed findings, Revised sections, Legal/compliance flags",
+          "passed": true,
+          "evidence": "All 4 sections present"
+        },
+        {
+          "text": "Detailed findings table uses severity labels (High/Medium/Low)",
+          "passed": true,
+          "evidence": "Severity labels present"
+        },
+        {
+          "text": "Flags We-are-excited anti-pattern",
+          "passed": true,
+          "evidence": "We're-excited anti-pattern flagged"
+        },
+        {
+          "text": "Flags hype superlatives (best-in-class, industry-leading, groundbreaking)",
+          "passed": true,
+          "evidence": "Hype superlatives flagged"
+        },
+        {
+          "text": "Flags exclamation marks as anti-pattern",
+          "passed": true,
+          "evidence": "Exclamation marks flagged"
+        },
+        {
+          "text": "Flags lead-gen CTA (sign up, free trial, book a demo) in legal or findings",
+          "passed": true,
+          "evidence": "Lead-gen CTA flagged"
+        },
+        {
+          "text": "Flags deprecated platform framing in favor of research lab positioning",
+          "passed": true,
+          "evidence": "Platform framing flagged"
+        },
+        {
+          "text": "Provides at least 3 before/after revisions for highest-severity issues",
+          "passed": true,
+          "evidence": "Before/after count: 5"
+        },
+        {
+          "text": "Flags persona mismatch (101-level language for expert audience)",
+          "passed": true,
+          "evidence": "Persona mismatch flagged"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 23,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Checks whether brand/voice.md already exists before proceeding",
+          "passed": true,
+          "evidence": "voice.md checked"
+        },
+        {
+          "text": "Lists all sections it will walk through (at least 5 of the 7 framework sections)",
+          "passed": true,
+          "evidence": "Response states 'all 8 framework sections' and references personality\u2192attributes\u2192audience\u2192pillars\u2192tone cascade"
+        },
+        {
+          "text": "Starts with Section 1 (Brand Personality) and prompts user with a question",
+          "passed": true,
+          "evidence": "Section 1 / question found"
+        },
+        {
+          "text": "Does NOT invent or fill in voice content without user input",
+          "passed": true,
+          "evidence": "Model quotes <to be defined> to show voice.md is NOT a stub; asks 'Which path \u2014 1, 2, or 3?' rather than filling in"
+        },
+        {
+          "text": "References the framework structure (not just generic questions)",
+          "passed": true,
+          "evidence": "Framework structure referenced"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 9,
+        "failed": 0,
+        "total": 9,
+        "time_seconds": 84,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Skill loads brand config before drafting (voice.md, facts.md, anti-patterns.md, style-guide.md)",
+          "passed": true,
+          "evidence": "Brand config load mentioned"
+        },
+        {
+          "text": "Identifies correct target persona (Production-AI CTO / heads of AI engineering)",
+          "passed": true,
+          "evidence": "Persona identified in response"
+        },
+        {
+          "text": "Produces at least 2 headline options",
+          "passed": true,
+          "evidence": "Headline-related markers found: 1"
+        },
+        {
+          "text": "Draft body exceeds 800 words",
+          "passed": true,
+          "evidence": "Word count: 1556"
+        },
+        {
+          "text": "Includes Gartner stat reference",
+          "passed": true,
+          "evidence": "Gartner reference found"
+        },
+        {
+          "text": "Includes LangChain stat reference",
+          "passed": true,
+          "evidence": "LangChain reference found"
+        },
+        {
+          "text": "CTA is research-distribution only \u2014 no lead-gen (no sign up / free trial / book a demo)",
+          "passed": true,
+          "evidence": "No lead-gen CTA found"
+        },
+        {
+          "text": "Uses named Echo pillar terminology (Evaluation Engineering, Agent Harness Engineering, etc.)",
+          "passed": true,
+          "evidence": "Echo pillar terminology used"
+        },
+        {
+          "text": "Provides SEO recommendations after the draft",
+          "passed": true,
+          "evidence": "SEO section found"
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "old_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 141.4,
+        "stddev": 48.8396,
+        "min": 88.3,
+        "max": 184.4
+      },
+      "tokens": {
+        "mean": 20902.6667,
+        "stddev": 2659.0081,
+        "min": 17922,
+        "max": 23031
+      }
+    },
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 65.3333,
+        "stddev": 36.7469,
+        "min": 23,
+        "max": 89
+      },
+      "tokens": {
+        "mean": 0.0,
+        "stddev": 0.0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.00",
+      "time_seconds": "+76.1",
+      "tokens": "+20903"
+    }
+  },
+  "notes": []
+}

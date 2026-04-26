@@ -1,0 +1,59 @@
+{
+  "expectations": [
+    {
+      "text": "Skill loads brand config before drafting (voice.md, facts.md, anti-patterns.md, style-guide.md)",
+      "passed": true,
+      "evidence": "Brand config load mentioned"
+    },
+    {
+      "text": "Identifies correct target persona (Production-AI CTO / heads of AI engineering)",
+      "passed": true,
+      "evidence": "Persona identified in response"
+    },
+    {
+      "text": "Produces at least 2 headline options",
+      "passed": true,
+      "evidence": "Headline-related markers found: 5"
+    },
+    {
+      "text": "Draft body exceeds 800 words",
+      "passed": true,
+      "evidence": "Word count: 1558"
+    },
+    {
+      "text": "Includes Gartner stat reference",
+      "passed": true,
+      "evidence": "Gartner reference found"
+    },
+    {
+      "text": "Includes LangChain stat reference",
+      "passed": true,
+      "evidence": "LangChain reference found"
+    },
+    {
+      "text": "CTA is research-distribution only \u2014 no lead-gen (no sign up / free trial / book a demo)",
+      "passed": true,
+      "evidence": "No lead-gen CTA found"
+    },
+    {
+      "text": "Uses named Echo pillar terminology (Evaluation Engineering, Agent Harness Engineering, etc.)",
+      "passed": true,
+      "evidence": "Echo pillar terminology used"
+    },
+    {
+      "text": "Provides SEO recommendations after the draft",
+      "passed": true,
+      "evidence": "SEO section found"
+    }
+  ],
+  "summary": {
+    "passed": 9,
+    "failed": 0,
+    "total": 9,
+    "pass_rate": 1.0
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "Assertions are well-targeted for this skill type."
+  }
+}

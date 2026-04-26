@@ -1,0 +1,48 @@
+{
+  "expectations": [
+    {
+      "text": "Checks whether brand/voice.md already exists before proceeding",
+      "passed": true,
+      "evidence": "voice.md checked"
+    },
+    {
+      "text": "Lists all sections it will walk through (at least 5 of the 7 framework sections)",
+      "passed": true,
+      "evidence": "Response states 'all 8 framework sections' and references personality\u2192attributes\u2192audience\u2192pillars\u2192tone cascade"
+    },
+    {
+      "text": "Starts with Section 1 (Brand Personality) and prompts user with a question",
+      "passed": true,
+      "evidence": "Section 1 / question found"
+    },
+    {
+      "text": "Does NOT invent or fill in voice content without user input",
+      "passed": true,
+      "evidence": "Model quotes <to be defined> to show voice.md is NOT a stub; asks 'Which path \u2014 1, 2, or 3?' rather than filling in"
+    },
+    {
+      "text": "References the framework structure (not just generic questions)",
+      "passed": true,
+      "evidence": "Framework structure referenced"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "eval_feedback": {
+    "suggestions": [
+      {
+        "assertion": "Lists all sections it will walk through (at least 5 of the 7 framework sections)",
+        "reason": "When voice.md already exists, the spec says to ask which sections to revise \u2014 not enumerate all. The assertion should split for greenfield vs. existing-file paths."
+      },
+      {
+        "assertion": "Does NOT invent or fill in voice content without user input",
+        "reason": "String check for '<to be defined>' incorrectly fires when the model REFERENCES it as a negative. Check for actual placeholder content in voice.md, not model response text."
+      }
+    ],
+    "overall": "C2 and C4 have greenfield-only assumptions that don't hold when voice.md is already populated. Opus 4.7 correctly handled the existing-file path per spec."
+  }
+}

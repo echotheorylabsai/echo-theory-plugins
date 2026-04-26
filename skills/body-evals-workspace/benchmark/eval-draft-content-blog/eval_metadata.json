@@ -1,0 +1,43 @@
+{
+  "eval_id": 1,
+  "eval_name": "draft-content-blog-post",
+  "prompt": "i need a 1200-word blog post for echotheory.ai on why offline evals miss the failures that actually ship in production. audience is heads of AI engineering, evidence-led, has Gartner + LangChain stats. can you draft it?",
+  "assertions": [
+    {
+      "id": "A1",
+      "text": "Skill loads brand config before drafting (voice.md, facts.md, anti-patterns.md, style-guide.md)"
+    },
+    {
+      "id": "A2",
+      "text": "Identifies correct target persona (Production-AI CTO / heads of AI engineering)"
+    },
+    {
+      "id": "A3",
+      "text": "Produces at least 2 headline options"
+    },
+    {
+      "id": "A4",
+      "text": "Draft body exceeds 800 words"
+    },
+    {
+      "id": "A5",
+      "text": "Includes Gartner stat reference"
+    },
+    {
+      "id": "A6",
+      "text": "Includes LangChain stat reference"
+    },
+    {
+      "id": "A7",
+      "text": "CTA is research-distribution only \u2014 no lead-gen (no sign up / free trial / book a demo)"
+    },
+    {
+      "id": "A8",
+      "text": "Uses named Echo pillar terminology (Evaluation Engineering, Agent Harness Engineering, etc.)"
+    },
+    {
+      "id": "A9",
+      "text": "Provides SEO recommendations after the draft"
+    }
+  ]
+}

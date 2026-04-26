@@ -1,0 +1,13 @@
+Results: 10/12 passed
+  [PASS] rate=0/3 expected=False: draft a 6-tweet thread on MCP server hardening, lead tweet has to land as a stan
+  [PASS] rate=0/3 expected=False: i need a 1200-word blog post for echotheory.ai on why offline evals miss the fai
+  [PASS] rate=0/3 expected=False: the agency sent over a draft landing page at https://example.com/echo-launch — p
+  [PASS] rate=0/3 expected=False: can you audit the blog post i just pasted below — flag anything off-brand, anyth
+  [FAIL] rate=0/3 expected=True: we just got our positioning aligned with the founders and need to actually write
+  [FAIL] rate=0/3 expected=True: i want to revise the tone-by-channel section of our voice doc — we just added a 
+  [PASS] rate=0/3 expected=False: review this prompt-injection paper from anthropic and summarize the key defenses
+  [PASS] rate=0/3 expected=False: draft a python function that computes trajectory drift between two agent runs gi
+  [PASS] rate=0/3 expected=False: set up a whisper-based voice transcription pipeline for our internal podcast rec
+  [PASS] rate=0/3 expected=False: write me a quick slack message for the team channel saying the new eval pipeline
+  [PASS] rate=0/3 expected=False: audit our AWS billing for unused EC2 instances and rightsizing opportunities for
+  [PASS] rate=0/3 expected=False: what's in brand/personas.md? just want to read through who we're targeting befor

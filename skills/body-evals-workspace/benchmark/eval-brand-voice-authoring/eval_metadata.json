@@ -1,0 +1,27 @@
+{
+  "eval_id": 3,
+  "eval_name": "brand-voice-authoring-greenfield",
+  "prompt": "walk me through brand voice doc section by section \u2014 brand/voice.md instead of vibes",
+  "assertions": [
+    {
+      "id": "C1",
+      "text": "Checks whether brand/voice.md already exists before proceeding"
+    },
+    {
+      "id": "C2",
+      "text": "Lists all sections it will walk through (at least 5 of the 7 framework sections)"
+    },
+    {
+      "id": "C3",
+      "text": "Starts with Section 1 (Brand Personality) and prompts user with a question"
+    },
+    {
+      "id": "C4",
+      "text": "Does NOT invent or fill in voice content without user input"
+    },
+    {
+      "id": "C5",
+      "text": "References the framework structure (not just generic questions)"
+    }
+  ]
+}

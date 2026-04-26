@@ -1,0 +1,39 @@
+{
+  "expectations": [
+    {
+      "text": "Checks whether brand/voice.md already exists before proceeding",
+      "passed": true,
+      "evidence": "voice.md checked"
+    },
+    {
+      "text": "Lists all sections it will walk through (at least 5 of the 7 framework sections)",
+      "passed": true,
+      "evidence": "Section markers: 8"
+    },
+    {
+      "text": "Starts with Section 1 (Brand Personality) and prompts user with a question",
+      "passed": true,
+      "evidence": "Section 1 / question found"
+    },
+    {
+      "text": "Does NOT invent or fill in voice content without user input",
+      "passed": true,
+      "evidence": "Asks rather than fills in"
+    },
+    {
+      "text": "References the framework structure (not just generic questions)",
+      "passed": true,
+      "evidence": "Framework structure referenced"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "Assertions are well-targeted for this skill type."
+  }
+}

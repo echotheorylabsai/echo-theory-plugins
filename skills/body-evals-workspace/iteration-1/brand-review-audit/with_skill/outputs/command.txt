@@ -1,0 +1,4 @@
+cd /Users/shubh/Desktop/src/echo-skills && CONTENT=$(cat skills/body-evals-workspace/sample-content-for-review.md) && claude -p "can you audit the blog post below — flag anything off-brand, anything that reads like marketing puffery, anything we'd get a citation challenge on. give me severity-graded findings + before/after rewrites for the worst offenders.
+
+---
+$CONTENT" --output-format text --model claude-sonnet-4-6 2>&1

@@ -1,0 +1,43 @@
+{
+  "eval_id": 2,
+  "eval_name": "brand-review-audit-pasted-content",
+  "prompt": "audit the pasted blog post \u2014 severity-graded findings + before/after rewrites",
+  "assertions": [
+    {
+      "id": "B1",
+      "text": "Output contains all 4 required sections: Summary, Detailed findings, Revised sections, Legal/compliance flags"
+    },
+    {
+      "id": "B2",
+      "text": "Detailed findings table uses severity labels (High/Medium/Low)"
+    },
+    {
+      "id": "B3",
+      "text": "Flags We-are-excited anti-pattern"
+    },
+    {
+      "id": "B4",
+      "text": "Flags hype superlatives (best-in-class, industry-leading, groundbreaking)"
+    },
+    {
+      "id": "B5",
+      "text": "Flags exclamation marks as anti-pattern"
+    },
+    {
+      "id": "B6",
+      "text": "Flags lead-gen CTA (sign up, free trial, book a demo) in legal or findings"
+    },
+    {
+      "id": "B7",
+      "text": "Flags deprecated platform framing in favor of research lab positioning"
+    },
+    {
+      "id": "B8",
+      "text": "Provides at least 3 before/after revisions for highest-severity issues"
+    },
+    {
+      "id": "B9",
+      "text": "Flags persona mismatch (101-level language for expert audience)"
+    }
+  ]
+}

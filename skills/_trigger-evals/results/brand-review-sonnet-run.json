@@ -1,0 +1,122 @@
+{
+  "skill_name": "brand-review",
+  "model": "claude-sonnet-4-6",
+  "results": [
+    {
+      "query": "draft a 6-tweet thread on MCP server hardening, lead tweet has to land as a standalone hook. no marketing energy, just the failure mode and the audit checklist.",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true,
+      "tests_boundary": "twitter threading \u2014 channel-specific draft-content"
+    },
+    {
+      "query": "i need a 1200-word blog post for echotheory.ai on why offline evals miss the failures that actually ship in production. audience is heads of AI engineering, evidence-led, has Gartner + LangChain stats. can you draft it?",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true,
+      "tests_boundary": "blog drafting \u2014 primary draft-content path"
+    },
+    {
+      "query": "can you audit the blog post i just pasted below \u2014 flag anything off-brand, anything that reads like marketing puffery, anything we'd get a citation challenge on. give me severity-graded findings + before/after rewrites for the worst offenders.",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false,
+      "tests_boundary": "primary review path \u2014 pasted content"
+    },
+    {
+      "query": "the agency sent over a draft landing page at https://example.com/echo-launch \u2014 please review it against our voice doc and surface anything that violates the anti-patterns or the citation rules",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false,
+      "tests_boundary": "review path with URL input + brand-config awareness"
+    },
+    {
+      "query": "we just got our positioning aligned with the founders and need to actually write the brand voice doc from scratch. can you walk me through it section by section so we end up with a real brand/voice.md instead of vibes?",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true,
+      "tests_boundary": "primary voice-doc authoring path \u2014 greenfield"
+    },
+    {
+      "query": "i want to revise the tone-by-channel section of our voice doc \u2014 we just added a podcast and need to define the register for it. existing voice.md is in brand/voice.md.",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true,
+      "tests_boundary": "voice-doc authoring path \u2014 section-level revision"
+    },
+    {
+      "query": "review this prompt-injection paper from anthropic and summarize the key defenses \u2014 i'm trying to figure out which apply to our agent harness",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true,
+      "tests_boundary": "near-miss for brand-review (review verb, but research-paper review, not marketing copy)"
+    },
+    {
+      "query": "set up a whisper-based voice transcription pipeline for our internal podcast recordings",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true,
+      "tests_boundary": "near-miss for brand-voice-authoring (voice keyword, but ASR not brand voice)"
+    },
+    {
+      "query": "audit our AWS billing for unused EC2 instances and rightsizing opportunities for the bare-metal orchestration cluster",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true,
+      "tests_boundary": "near-miss for brand-review (audit verb, unrelated domain \u2014 flagged because Echo terminology appears)"
+    },
+    {
+      "query": "draft a python function that computes trajectory drift between two agent runs given the tool-call sequences",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true,
+      "tests_boundary": "near-miss for draft-content (draft verb, but code, not content)"
+    },
+    {
+      "query": "write me a quick slack message for the team channel saying the new eval pipeline shipped. just internal, casual.",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true,
+      "tests_boundary": "negative for draft-content (writing verb, but internal comms outside Phase 1 channels)"
+    },
+    {
+      "query": "what's in brand/personas.md? just want to read through who we're targeting before my next call",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true,
+      "tests_boundary": "negative for all three (read action, not draft/review/author)"
+    }
+  ],
+  "summary": {
+    "total": 12,
+    "passed": 10,
+    "failed": 2,
+    "pass_rate": 0.833,
+    "false_negatives": 2,
+    "false_positives": 0
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "skill_name": "brand-review",
+  "description": "Evaluate existing marketing content (pasted, file-path, or URL) against brand voice, facts, personas, anti-patterns, style guide, and universal legal/compliance flags. Use when the user asks to audit, check, proof, critique, or revise existing copy, or wants severity-graded findings with before/after revisions. Do NOT use for creating new content from scratch (use draft-content) or for authoring a brand voice document (use brand-voice-authoring).",
+  "results": [
+    {
+      "query": "i need a 1200-word blog post for echotheory.ai on why offline evals miss the failures that actually ship in production. audience is heads of AI engineering, evidence-led, has Gartner + LangChain stats. can you draft it?",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "draft a 6-tweet thread on MCP server hardening, lead tweet has to land as a standalone hook. no marketing energy, just the failure mode and the audit checklist.",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "can you audit the blog post i just pasted below \u2014 flag anything off-brand, anything that reads like marketing puffery, anything we'd get a citation challenge on. give me severity-graded findings + before/after rewrites for the worst offenders.",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "the agency sent over a draft landing page at https://example.com/echo-launch \u2014 please review it against our voice doc and surface anything that violates the anti-patterns or the citation rules",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "we just got our positioning aligned with the founders and need to actually write the brand voice doc from scratch. can you walk me through it section by section so we end up with a real brand/voice.md instead of vibes?",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "i want to revise the tone-by-channel section of our voice doc \u2014 we just added a podcast and need to define the register for it. existing voice.md is in brand/voice.md.",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "review this prompt-injection paper from anthropic and summarize the key defenses \u2014 i'm trying to figure out which apply to our agent harness",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "draft a python function that computes trajectory drift between two agent runs given the tool-call sequences",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "set up a whisper-based voice transcription pipeline for our internal podcast recordings",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "audit our AWS billing for unused EC2 instances and rightsizing opportunities for the bare-metal orchestration cluster",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "write me a quick slack message for the team channel saying the new eval pipeline shipped. just internal, casual.",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "what's in brand/personas.md? just want to read through who we're targeting before my next call",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    }
+  ],
+  "summary": {
+    "total": 12,
+    "passed": 10,
+    "failed": 2
+  }
+}

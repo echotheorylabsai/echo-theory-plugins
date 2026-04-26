@@ -1,0 +1,14 @@
+Evaluating: Author or revise a brand voice document (`brand/voice.md`) using a structured framework that walks the user through brand personality, voice attributes (positioned on spectrums), audience awareness, messaging pillars, tone-by-channel and tone-by-situation matrices, brand-specific terminology, and voice anti-patterns. Use when the user wants to create, draft, populate, define, revise, or update a brand voice doc, voice guidelines, or tone-of-voice document. Do NOT use for reviewing existing content (use brand-review) or drafting marketing content (use draft-content).
+Results: 10/12 passed
+  [PASS] rate=0/3 expected=False: i need a 1200-word blog post for echotheory.ai on why offline evals mi
+  [PASS] rate=0/3 expected=False: draft a 6-tweet thread on MCP server hardening, lead tweet has to land
+  [PASS] rate=0/3 expected=False: can you audit the blog post i just pasted below — flag anything off-br
+  [FAIL] rate=0/3 expected=True: we just got our positioning aligned with the founders and need to actu
+  [PASS] rate=0/3 expected=False: the agency sent over a draft landing page at https://example.com/echo-
+  [FAIL] rate=0/3 expected=True: i want to revise the tone-by-channel section of our voice doc — we jus
+  [PASS] rate=0/3 expected=False: review this prompt-injection paper from anthropic and summarize the ke
+  [PASS] rate=0/3 expected=False: draft a python function that computes trajectory drift between two age
+  [PASS] rate=0/3 expected=False: set up a whisper-based voice transcription pipeline for our internal p
+  [PASS] rate=0/3 expected=False: audit our AWS billing for unused EC2 instances and rightsizing opportu
+  [PASS] rate=0/3 expected=False: write me a quick slack message for the team channel saying the new eva
+  [PASS] rate=0/3 expected=False: what's in brand/personas.md? just want to read through who we're targe

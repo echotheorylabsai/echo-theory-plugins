@@ -1,0 +1,59 @@
+{
+  "expectations": [
+    {
+      "text": "Output contains all 4 required sections: Summary, Detailed findings, Revised sections, Legal/compliance flags",
+      "passed": true,
+      "evidence": "All 4 sections present"
+    },
+    {
+      "text": "Detailed findings table uses severity labels (High/Medium/Low)",
+      "passed": true,
+      "evidence": "Severity labels present"
+    },
+    {
+      "text": "Flags We-are-excited anti-pattern",
+      "passed": true,
+      "evidence": "We're-excited anti-pattern flagged"
+    },
+    {
+      "text": "Flags hype superlatives (best-in-class, industry-leading, groundbreaking)",
+      "passed": true,
+      "evidence": "Hype superlatives flagged"
+    },
+    {
+      "text": "Flags exclamation marks as anti-pattern",
+      "passed": true,
+      "evidence": "Exclamation marks flagged"
+    },
+    {
+      "text": "Flags lead-gen CTA (sign up, free trial, book a demo) in legal or findings",
+      "passed": true,
+      "evidence": "Lead-gen CTA flagged"
+    },
+    {
+      "text": "Flags deprecated platform framing in favor of research lab positioning",
+      "passed": true,
+      "evidence": "Platform framing flagged"
+    },
+    {
+      "text": "Provides at least 3 before/after revisions for highest-severity issues",
+      "passed": true,
+      "evidence": "Before/after count: 5"
+    },
+    {
+      "text": "Flags persona mismatch (101-level language for expert audience)",
+      "passed": true,
+      "evidence": "Persona mismatch flagged"
+    }
+  ],
+  "summary": {
+    "passed": 9,
+    "failed": 0,
+    "total": 9,
+    "pass_rate": 1.0
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "Assertions are well-targeted for this skill type."
+  }
+}
