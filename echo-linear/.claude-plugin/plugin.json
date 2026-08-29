@@ -1,0 +1,11 @@
+{
+  "name": "echo-linear",
+  "version": "1.0.0",
+  "description": "Turn approved specs, PRDs and implementation plans into Linear projects, milestones and issues written in product language, with an adversarial review before anything is reported as done.",
+  "author": {
+    "name": "Echo Theory Labs",
+    "email": "team@echotheory.ai"
+  },
+  "keywords": ["linear", "planning", "product", "issues", "echo-theory-labs"],
+  "license": "MIT"
+}
