@@ -4,6 +4,9 @@ Written for a non-engineer. Plain language, short lines, no jargon, no long para
 
 **Word caps are hard.** If a section will not fit, the content is wrong — not the cap.
 
+**Do not write `**Label:**` immediately before a link** — Linear's parser renders it as
+`**Label: **[link]`, with the space inside the bold. Use `**Label** · [link]` instead.
+
 | Artifact | Cap |
 |---|---|
 | Issue description | ~250 words |
@@ -16,7 +19,7 @@ Written for a non-engineer. Plain language, short lines, no jargon, no long para
 
 ```markdown
 **Order:** Phase A.2 · Blocked by ECH-41
-**Context:** [Spec](link) §3 · [Plan](link) §Phase A
+**Context** · [Spec](link) §3 · [Plan](link) §Phase A
 
 ## What we're building
 ≤40 words, plain language. What exists after this ships.

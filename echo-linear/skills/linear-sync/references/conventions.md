@@ -76,6 +76,18 @@ Descriptions get edited by hand. A full-description rewrite destroys that work.
 
 - **A specific wrong statement** → anchored `replace` on that exact text.
 
+### Keep the cap when updates accumulate
+
+Each dated callout costs roughly 40 words. Four updates will push a 250-word issue over
+its cap, and the description degrades into a changelog.
+
+**Before prepending a new callout, count the ones already there.**
+
+- Two callouts at most stay at the top.
+- When adding a third, move the **oldest** one into a Linear comment on that issue, then
+  delete it from the description with an anchored `replace`.
+- The description stays a description. The comment thread carries the history.
+
 ### Traps
 
 | Field | Behaviour |
