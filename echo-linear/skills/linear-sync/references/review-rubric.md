@@ -20,16 +20,17 @@ the ones you cannot see from your own intent.
 
 The rubric is the mechanism. The subagent is an upgrade, not a requirement.
 
-## The six checks
+## The seven checks
 
 | # | Check | Fails when |
 |---|---|---|
 | 1 | **Coverage** | An approved item has no artifact, an artifact has no basis in the approved material, or one item is split across two issues |
 | 2 | **No leakage** | File paths, function names, table names or schema appear in the prose (links are fine) |
 | 3 | **Readable** | A PM could not follow it unaided; jargon; a word cap exceeded; padding |
-| 4 | **Wiring** | Wrong project, missing milestone, not exactly two labels, wrong state, broken title sequence, or a blocking chain that contradicts the plan |
+| 4 | **Wiring** | Wrong project, missing or wrong milestone, a milestone that no plan phase justifies, not exactly two labels, wrong state, broken title sequence, or a blocking chain that contradicts the plan |
 | 5 | **Links resolve** | A referenced spec or plan does not exist, or a GitHub URL points at a file that was never pushed |
 | 6 | **Codebase alignment** | A component, surface or product named in the issue cannot be found in the repo |
+| 7 | **Nothing was destroyed** | A milestone or description that existed before this run lost text. Compare against what you read before writing. Anything gone that is not an intentional, stated correction is a failure. |
 
 ## What to do with a failure
 

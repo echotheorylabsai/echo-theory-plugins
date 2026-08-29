@@ -1,6 +1,6 @@
 {
   "name": "echo-linear",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Turn approved specs, PRDs and implementation plans into Linear projects, milestones and issues written in product language, with an adversarial review before anything is reported as done.",
   "author": {
     "name": "Echo Theory Labs",

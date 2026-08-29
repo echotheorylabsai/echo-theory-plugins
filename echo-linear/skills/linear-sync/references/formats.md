@@ -40,6 +40,19 @@ As a <who>, I <do this> so that <outcome>.
 - only when something is genuinely at risk of being misread
 ```
 
+**Add `## What the user sees`** — 2–4 bullets, directly after `## User story` — whenever the
+work changes anything a person interacts with: a screen, a flow, a message, an email, a
+state a user can land in. Describe what they see and do, never how it is built.
+
+```markdown
+## What the user sees
+- A "Marketing" item in the left nav, one sub-page per capability
+- Each page shows the latest numbers with the date they were collected
+- Where there is no data yet, the page says so instead of showing a zero
+```
+
+Omit the section entirely for work with no user-facing surface.
+
 For a simple (non-phased) project the Order line reads `**Order:** 2 of 5 · Blocked by ECH-41`.
 
 **Optional:** `## How it fits` with a mermaid diagram — **only** when three or more

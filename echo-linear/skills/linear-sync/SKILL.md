@@ -89,8 +89,8 @@ If they amend, re-print and wait again.
 ## 4. Write
 
 Follow `references/formats.md` for what goes in each description, and
-`references/conventions.md` for titles, labels, links, relations and the **safe-update
-rules**. Record the identifier and URL of every artifact you touch — step 5 needs the list.
+`references/conventions.md` for titles, labels, **milestones**, links, relations and the
+**safe-update rules**. Record the identifier and URL of every artifact you touch — step 5 needs the list.
 
 ## 5. Adversarial review
 
