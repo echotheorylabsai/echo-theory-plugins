@@ -94,7 +94,8 @@ its cap, and the description degrades into a changelog.
 |---|---|
 | `labels` | **Replaces the entire set.** Always re-send the full intended set, or existing labels are silently dropped. |
 | `links`, `blocks`, `blockedBy`, `relatedTo` | Append-only. Safe to add to. |
-| `patch` | Each anchor must match **exactly once**. One failing op aborts the whole save. |
+| `patch` | Each anchor must match **exactly once**. One failing op aborts the whole save — nothing changes, which is safe but silent. |
+| `patch` anchors | Must match what Linear **stored**, not what you sent. Its parser rewrites markdown on save. **Always `get` the issue first and copy the anchor from the stored text.** |
 
 ## Harness portability
 
