@@ -4,16 +4,19 @@ Linear is the record. The ledger is a local cache. When they disagree, Linear wi
 
 ## States, truthfully
 
-The workspace's states are `Backlog`, `Todo`, `In Progress`, `In Review`, `Done`,
-`Canceled`, `Duplicate` — restated here so this file stands alone. **Never invent one.**
-There is no `Blocked` state. Full workspace facts:
+The tables below name Echo Theory Labs' states — `Backlog`, `Todo`, `In Progress`,
+`In Review`, `Done`, `Canceled`, `Duplicate` — restated so this file stands alone. **Step 0
+lists the actual workspace's states**; where they differ, use its equivalents and read
+`In Review` below as "the state meaning finished but not merged". **Never invent one**, and
+note there is no `Blocked` state here. Full workspace notes:
 `../../linear-sync/references/conventions.md`.
 
 | Situation | State |
 |---|---|
 | Actively working the issue | `In Progress` — set after the re-read, before the first edit |
 | Its work is committed to the phase branch and independently reviewed, but the phase PR has not merged | `In Review` — this is where most finished issues sit until the checkpoint |
-| Stopped: blocked, awaiting a decision, or grind limit hit | **Leave `In Progress`** and say why in a comment. Moving it back reads as abandoned; moving it to `In Review` claims work that is not finished |
+| Stopped mid-work: blocked, awaiting a decision, or grind limit hit | **Leave `In Progress`** and say why in a comment. Moving it back reads as abandoned; moving it to `In Review` claims work that is not finished |
+| Stopped **after** its work was committed and the phase PR opened — post-PR review feedback, a pending decision | **Leave `In Review`.** The work is committed and reviewed; the decision is about what happens next, not about whether it is finished |
 | The phase PR merged and was confirmed from the remote | `Done` — set for every issue in that phase at the checkpoint |
 | Unstarted | `Backlog` / `Todo` — leave as found |
 | Found `Canceled` or `Duplicate` at step 0 | Skip it. Do not resurrect it; say so in the delivery plan |
@@ -73,12 +76,18 @@ State facts and options. **Never announce a decision, a new plan, or a changed c
 ### Approval record
 
 ```markdown
-**Approved 2026-08-30** — backfill the 2,400 unsealed rows before sealing forward.
+**Approved 2026-08-30 by the user in session** — backfill the 2,400 unsealed rows before
+sealing forward.
 
 **Asked** — see the discrepancy comment above; three options given.
 **Answer** — option (a), backfill first.
 **Changes** — plan §Phase A.2 gains a backfill step; this issue's criterion 2 is patched.
 ```
+
+**Name who approved**, in the first line: the user, or a named human reviewer on the PR. A
+reviewer subagent cannot approve anything — it reports. "Approved" with no approver is not a
+record, and across a session boundary it is indistinguishable from something you decided
+yourself.
 
 Post it **before** acting on the approval, on the issue the change affects. Reconciliation
 cites this comment; nothing else counts as provenance.
@@ -140,8 +149,11 @@ changes, which is safe but gives no error you will notice.
 ### 2. `labels` replaces the entire set
 
 **`get` the issue and read its current labels before writing any.** Send the complete
-intended set, or the existing ones vanish silently. `links`, `blocks`, `blockedBy` and
-`relatedTo` are append-only and safe.
+intended set, or the existing ones vanish silently.
+
+`links`, `blocks`, `blockedBy` and `relatedTo` behave the opposite way: adding is safe and
+does not replace the set. A wrong dependency **can** still be corrected — it just needs the
+explicit remove operation, not omission.
 
 Whenever an update replaces a collection, send the complete intended collection.
 
@@ -150,7 +162,8 @@ Whenever an update replaces a collection, send the complete intended collection.
 Its `description` is **full-replace**, so a careless update destroys a hand-written body.
 This skill does not edit milestones without approval — but if an approved change requires
 it: `get` it, read the **complete** body, build callout + blank line + existing body
-verbatim, save the whole string. If the body is long, was truncated in the response, or
+verbatim, save the whole string — **and send `project` too**, which is required even on an
+update. If the body is long, was truncated in the response, or
 contains anything you cannot reproduce exactly — **stop and ask.** Losing it is
 irreversible.
 

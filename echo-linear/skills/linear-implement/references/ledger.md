@@ -110,8 +110,10 @@ close.
 After any interruption — a new session, a context reset, a stopped run:
 
 1. Read the ledger. **If there is none** — a different machine, a cleared checkout — rebuild
-   it from Linear rather than stopping: issue states plus evidence comments carry the same
-   facts. Say that you rebuilt it, and that the pre-`In Review` detail is gone.
+   it from Linear rather than stopping. Issue states, evidence comments, **approval-record
+   comments and discrepancy comments** carry the facts; the approval records repopulate
+   `Decisions`, so read every issue's comments, not just its description. Say that you
+   rebuilt it, and what did not survive.
 2. Take the rebuilt ledger as the account of any issue already `In Progress` or `Done`.
    Only stop and ask if Linear shows work the rebuilt record cannot explain — for example an
    issue `In Progress` with no evidence comment and no branch.
@@ -128,7 +130,9 @@ After any interruption — a new session, a context reset, a stopped run:
    evidence comment and no commit is genuinely unstarted.
 8. If the phase branch and worktree still exist, reuse them. Cut a new worktree only when
    starting a phase that has none.
-9. Then continue from step 2, including the phase's pre-flight and the issue's re-read.
+9. Then continue from step 2. **Re-run the phase's pre-flight if the phase has not started or
+   a phase boundary was crossed**; if you are resuming mid-phase and it already ran against
+   this same merged code, only the resumed issue's own re-read is needed.
 
 Never resume from the ledger alone. It records what you intended; Linear records what
 happened.

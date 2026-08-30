@@ -52,8 +52,9 @@ issue, or nothing.
 
 Previous phases changed the codebase. This phase's issues were written before that happened.
 
-Re-read, fresh: this phase's issues from Linear, and the sources they link. Then check
-against the code as it now stands:
+Re-read, fresh: this phase's issues from Linear — **including their comments**, which is where
+approval records and discrepancies live — and the sources they link. Citing an approval you
+have not fetched is not citing it. Then check against the code as it now stands:
 
 - Are the acceptance criteria **still achievable**, and do they still mean anything? A
   criterion satisfied incidentally by the last phase is not a criterion any more.
@@ -115,7 +116,7 @@ The code is already live; the honest record of that is the point, not a tidy doc
 ## Full pass — at the close
 
 Before declaring the project complete, read the spec, the plan, the project, every milestone
-and every issue against the code that exists.
+and every issue — **with its comments** — against the code that exists.
 
 The closing report must state, in plain words, **either**:
 

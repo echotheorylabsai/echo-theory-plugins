@@ -42,8 +42,7 @@ and any contributing guide first, and follow what you find. Absent a convention:
   branch is named for the issues it carries — `feat/<project-slug>-ech-41-ech-42`, or
   `feat/<project-slug>-batch-1` when that is unwieldy
 
-Either way, put the chosen names in the step-1 plan so they are approved with everything else. Use the repo's own convention if it has one; check recent branches
-and any contributing guide first.
+Either way, put the chosen names in the step-1 plan so they are approved with everything else.
 
 **Commit per issue.** Each issue gets its own commit or commits on the phase branch, with
 the issue key in the message, so the phase PR stays reviewable issue by issue.
@@ -149,8 +148,9 @@ Prove an ordering or concurrency claim with **explicit observable boundaries** �
 event, a lock, a barrier. Never with a timing sleep or an unconstrained parallel call.
 
 **Skipping test-first needs the user's approval, not your own.** If you believe it is
-genuinely inapplicable for an issue, say which issue and why, and ask. Record the approval
-in the ledger and the evidence comment.
+genuinely inapplicable for an issue, say which issue and why, and ask. Record the answer as
+an **approval-record comment** (`linear-updates.md`) — the same format as any other approval,
+so reconciliation can find it — and note it in the ledger.
 
 **Passing tests are evidence about code.** They are never proof of deployment, provider
 state, or production authorization.
@@ -206,6 +206,9 @@ criteria, nothing else.
 
 **The counter resets** when the user reviews a stop and says continue, and at the start of
 each issue. Record it in the ledger so a resumed session does not inherit a stale count.
+
+If the user's answer to a stop is itself a change — "do it this other way" — that is a
+material change, not a continuation. Take it through the gate and record it.
 
 Three failed cycles on one issue is the stop. Commit the work in progress to its branch so
 the evidence survives — prefix the message `WIP (unreviewed):` and record it in the ledger,

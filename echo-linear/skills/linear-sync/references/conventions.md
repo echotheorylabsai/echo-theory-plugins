@@ -146,6 +146,19 @@ description's Context line as plain text:
 This is the **one** sanctioned exception to "no file paths in the prose", and the confirm
 table must say the link is local-only.
 
+### When the source is a Linear comment, not a file
+
+`linear-implement` hands back mid-run when an approved change needs an issue that does not
+exist. Its source is then an **approval-record comment** on an existing issue — not a spec
+file, and not a branch anyone can reach.
+
+That is a legitimate source and it does **not** trip the unpushed-source stop: a comment in
+Linear is reachable by everyone who can see the issue, which is the whole test.
+
+- Link the parent issue as a **related issue**, not as a file link.
+- Context line: `**Context** · Approved on ECH-42 · see the approval record of 2026-08-30`.
+- Never push a half-built phase branch to manufacture a URL for it.
+
 ### Where specs live must be committable
 
 If the repo gitignores the directory specs are written to, every issue this skill files will

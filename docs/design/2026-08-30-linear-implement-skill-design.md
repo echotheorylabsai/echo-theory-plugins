@@ -92,20 +92,24 @@ may be skipped, including on a single-issue project.
 
 ### 6.1 Step 0 — adopt
 
-**Check for a resume — from Linear, not from disk.** Any issue already `In Progress`,
-`In Review` or `Done` means this is a resumed run, whether or not a ledger exists locally: a
-different machine has none, and keying off the file would start a fresh run over live work.
-Read the ledger or rebuild it from Linear, then rejoin at step 1 — a resume does not skip the
-gate, which belongs to the session, not the project. Also check whether the last completed
-phase's post-flight actually ran; if it did not, run it before touching the next phase.
-
 Identify the project from the invocation (ID, URL or name). An issue key is resolved to its
 parent project and confirmed. If none was named, ask. Never guess and never pick the most
 recent project.
 
 Read it whole from Linear — overview, milestones, every issue, attachments, links,
-comments, relations, dependencies and states — then follow every link and read the
-**approved sources themselves**, not their summaries in the issue.
+**comments**, relations, dependencies and states. Comments carry the approval records
+everything downstream depends on.
+
+**Then decide whether this is a resume — from Linear, not from disk.** Any issue already
+`In Progress`, `In Review` or `Done` means it is, whether or not a ledger exists locally: a
+different machine has none, and keying off the file would start a fresh run over live work.
+Read the ledger or rebuild it from Linear, then rejoin at step 1 — a resume does not skip the
+gate, which belongs to the session, not the project. On a resume, also check the last
+completed phase's post-flight actually ran; if it did not, run it before touching the next
+phase.
+
+Then follow every link and read the **approved sources themselves**, not their summaries in
+the issue.
 
 Identify the authoritative baseline, preferring a committed, pushed, pinned link. Confirm
 each source is **readable**. Where you cannot tell whether it is current — an uncommitted or
@@ -256,8 +260,12 @@ If it has to be argued, it is material.
 
 | | Path |
 |---|---|
-| **Material** | Get explicit approval first. Then update the authoritative source, then the affected Linear records under the safe-update rules. |
-| **Non-material** | Update the implementation plan before coding. Then patch every affected issue with an anchored patch, attach the current source link if needed, and comment explaining the change. Re-read the changed sources and records before resuming. |
+| **Material** | Get explicit approval. **Post an approval-record comment on the issue before acting on it** — quoting what was approved, naming who approved, dated. Then update the authoritative source, then the affected Linear records under the safe-update rules. Re-read both before resuming. |
+| **Non-material** | Post the same record comment, saying what the code forced and why it meets all five conditions. Update the implementation plan before coding. Then patch every affected issue with an anchored patch, attach the current source link if needed. Re-read the changed sources and records before resuming. |
+
+The approval-record comment is what makes reconciliation enforceable: it is the only
+provenance that survives a session, and reconciliation cites it or treats the change as
+unapproved.
 
 A specification change that alters requirements or behaviour is always material.
 
@@ -317,12 +325,14 @@ documentation are current; that required verification and independent reviews pa
 that every external gate is satisfied or explicitly accepted as a separate follow-up.
 
 Then run the final relevant repository verification and one final independent
-whole-project review. Fix and re-review material findings before claiming completion.
+whole-project review. Fix and re-review *significant* findings before claiming completion —
+not "material", which names the gate that halts the run.
 
 Report verified results, external assumptions, completed issues, remaining gates and gaps.
 
-**Never mark the project Done while a required outcome sits behind an unsatisfied external
-gate**, unless the approved workflow explicitly reclassified it as a separate follow-up.
+**Setting the project's own state is the user's call.** At the close, report that every
+outcome is met and ask whether to mark the project complete. Never set it while a required
+outcome sits behind an unsatisfied external gate, even if asked — name the gate instead.
 
 ---
 
@@ -334,10 +344,12 @@ record has to be concrete rather than "a ledger or equivalent".
 - **Path:** `.linear-implement/<slug>.md` in the primary checkout of the **target** repo.
   The slug is the **Linear project identifier**, not its name — a derived slug differs
   between sessions and a resume then finds nothing.
-- **Gitignored in the target repo.** The rollout's `.gitignore` entry protects only this
-  repo. On first use the skill confirms the entry exists in whatever repo it is running
-  against and adds it if not — otherwise the ledger dirties the checkout and trips step 0's
-  own stop condition.
+- **Gitignored in the target repo.** The rollout's `.gitignore` entry protects only this repo.
+  Step 0 checks whether the target repo already ignores `.linear-implement/`, so the delivery
+  plan can disclose it; if not, the one-line edit is made and committed **inside the first
+  phase's worktree** and rides in that phase's PR. Never in the primary checkout — an
+  uncommitted change there breaks the next pull — and never straight to the integration
+  branch, which skips review and fails on a protected branch.
 - **Not in the worktree** — per-phase worktrees are removed at the end of each milestone
   and would take the ledger with them.
 - **Created after the step-1 gate**, never before. Nothing reaches disk while the user is
@@ -504,7 +516,10 @@ Four accuracy errors were caught by testing the live MCP schema rather than read
 milestones *do* take comments, a milestone update requires `project`, blocking relations *can*
 be removed, and the `--ff-only` claim was overstated.
 
-**Round seven is running against this text; its result is not yet recorded.**
+**Round seven** — no blockers. 15 of 15 earlier fixes closed, four partial, plus two hard
+regressions the fixes had introduced: a resume path that both did and did not re-run
+pre-flight, and a state table never amended for the post-PR carve-out. Fixed. The fresh-eyes
+arm of that round is still outstanding.
 
 ### Still outstanding
 

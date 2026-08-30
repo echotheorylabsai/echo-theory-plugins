@@ -54,8 +54,10 @@ and its `In Review` issues; nothing is cleaned up and nothing is reverted.
   phase means it ships in that PR; if unsure, ask.
 - On return, this is a **resume**: re-read from Linear, add the new issue to the ledger's
   order table, re-print the delivery plan for what remains, and get a yes. Then continue
-  **within the phase** at the next unfinished issue — do not re-run the phase's pre-flight on
-  work already `In Review`.
+  **within the phase** at the next unfinished issue. The phase's pre-flight already ran and
+  the phase has not merged since, so re-run only the part that changed: the new issue's own
+  premise. `ledger.md` § Resuming covers the general case, where the pre-flight does re-run
+  because a phase boundary was crossed.
 
 ### Source precedence
 
@@ -72,21 +74,22 @@ given an **issue** key, resolve it to its parent project and confirm which proje
 about to execute. **If none was named, ask.** Never guess, never take the most recent
 project.
 
-**Then check for a resume — from Linear, not from disk.** If any issue in the project is
-already `In Progress`, `In Review` or `Done`, **this run is a resume**, whether or not a
-ledger exists locally. A ledger is a convenience; a different machine or a cleared checkout
-has none, and keying off the file would silently start a fresh run over live work.
+Read it **whole** from Linear: overview, milestones, every issue, attachments, links,
+**comments**, relations, dependencies and states. Comments carry the approval records
+everything downstream depends on.
+
+**Then decide whether this is a resume — from Linear, not from disk.** If any issue is
+already `In Progress`, `In Review` or `Done`, **it is**, whether or not a ledger exists
+locally. A ledger is a convenience; a different machine or a cleared checkout has none, and
+keying off the file would silently start a fresh run over live work.
 
 Follow `references/ledger.md` § Resuming — read the ledger, or rebuild it from Linear when
 there is none. A resume still passes through the step-1 gate.
 
-**Check whether the last completed phase's post-flight ran.** If a phase is `Done` but the
-plan, its issues or its milestone still describe something else, the previous session died
-between the merge and its reconciliation. Run that post-flight now, before touching the next
-phase — its approval records are what this phase's pre-flight has to read.
-
-Read it **whole** from Linear: overview, milestones, every issue, attachments, links,
-comments, relations, dependencies and states.
+**On a resume, check the last completed phase's post-flight ran.** If a phase is `Done` but
+the plan, its issues or its milestone still describe something else, the previous session
+died between the merge and its reconciliation. Run that post-flight now, before touching the
+next phase — its approval records are what this phase's pre-flight has to read.
 
 Then follow every link and read the **approved sources themselves**, not the issue's
 summary of them. Identify the authoritative baseline — prefer a committed, pushed, pinned
@@ -97,6 +100,10 @@ so in the delivery plan rather than asserting it is current.
 
 **Determine the integration branch.** The repo's default branch, unless its instructions
 name another. State which you picked. If there is no clear default, ask.
+
+**Check now whether `.linear-implement/` is already gitignored**, so the delivery plan can say
+whether a `.gitignore` line rides in the first phase's PR. Nothing is written that the plan
+did not show, so this cannot wait until the ledger is created.
 
 **List the workspace's states.** This plugin runs in workspaces other than the one it was
 written for. The whole per-milestone model rests on there being a state meaning *finished
@@ -252,14 +259,20 @@ Move on only when the current issue is complete and its real dependencies permit
 
 **Grind limit.** A *verification cycle* is one implement-then-verify attempt after the
 first red test. Three failed cycles on one issue **stops the run**: commit the work in
-progress to the branch so the evidence survives, record what failed and what you believe is
-wrong in the ledger and on the issue, leave the state as it is, report, and ask. Do not
-keep grinding.
+progress so the evidence survives, **prefixed `WIP (unreviewed):`**, record what failed and
+what you believe is wrong in the ledger and on the issue, leave the state as it is, report,
+and ask. Do not keep grinding.
+
+**No `WIP (unreviewed):` commit may be in the phase PR.** Before opening it, every one must
+be finished and independently reviewed, or dropped from the branch. If the PR is *already*
+open — feedback stopped mid-fix — you cannot drop it without a force-push, which is
+forbidden: finish and review it, or revert it with a new commit that says why.
 
 ### The material-change gate
 
 When evidence shows an approved source is wrong, incomplete or unsafe, **stop at that
-decision boundary.** Do not silently implement a different design.
+decision boundary.** Do not silently implement a different design. Commit whatever is
+half-built as `WIP (unreviewed):` so it cannot reach a PR unexamined.
 
 Two things you may do immediately, without approval:
 
@@ -283,7 +296,7 @@ issue.
 
 | | What happens |
 |---|---|
-| **Material** | Get explicit approval. **Then post an approval-record comment on the issue** — quoting what was approved, dated — *before* acting on it. Then update the authoritative source, then the affected Linear records under the safe-update rules. |
+| **Material** | Get explicit approval. **Then post an approval-record comment on the issue** — quoting what was approved, dated — *before* acting on it. Then update the authoritative source, then the affected Linear records under the safe-update rules. Re-read both before resuming. |
 | **Non-material** | Post the same record comment, saying what the code forced and why it meets all five conditions. Update the implementation plan before coding. Then patch every affected issue with an anchored patch, attach the current source link if needed. Re-read the changed sources and records before resuming. |
 
 **The approval-record comment is not optional, and it is not paperwork.** Reconciliation
