@@ -47,6 +47,61 @@ But recovery is coarser: if a phase PR is rejected, **all of its issues roll bac
 Keep phases small enough that this is acceptable; `linear-sync` already targets 1–4 issues
 per milestone.
 
+## `origin/<integration-branch>` is a moving target
+
+**Assume other agents and people are merging into it while you work.** A phase that takes an
+hour is an hour of other people's commits you have not seen. Treat every fetch result as
+current only at the instant you fetched it.
+
+### Re-sync at three points, not one
+
+| When | Why |
+|---|---|
+| Before cutting the phase worktree | The obvious one |
+| **Immediately before opening the phase PR** | Otherwise you open a PR against a base that moved |
+| **Immediately before merging** | It can move again between opening and merging |
+
+At each of the last two: `git fetch origin`, and if the integration branch advanced,
+integrate it into the phase branch — merge or rebase, whichever the repo already uses.
+
+### Re-verify after every re-sync
+
+**A green test run from before an integration proves nothing about the code after it.** Once
+you have pulled someone else's commits in, run the relevant suite again. A clean textual
+merge can still be semantically broken: another agent may have changed a function signature,
+a schema, or a default your work depends on, with no conflict marker anywhere.
+
+This is the failure this whole section exists to prevent. Merging on stale green is how two
+correct branches produce a broken integration branch.
+
+### A conflict is a stop
+
+If integrating produces a conflict, **stop and ask.** Someone else's change collided with
+yours and their intent is not yours to guess. Report both sides, the files, and what each
+appears to be doing.
+
+The one exception: a conflict with no semantic content — an append-only list, an import
+block, a lockfile the repo regenerates. Resolve those, say in the PR that you did, and say
+which.
+
+### Never rewrite a shared branch
+
+No force-push to a branch that has been pushed. No rebase of the integration branch. No
+`git reset` to get past a divergence. If your local integration branch has commits the
+remote does not, that is a stop — see above.
+
+### If it keeps moving
+
+If the integration branch advances more than twice during one phase, the phase is too long
+for how busy this repo is. Say so at the checkpoint and offer to shorten the remaining
+boundaries. Repeated re-syncs are a signal, not just a chore.
+
+### Someone else may be running this too
+
+At step 0, note any other worktrees or recent branches that suggest concurrent work, and say
+so in the delivery plan. An issue already `In Progress` that your ledger does not account for
+means someone else is in there — stop and ask, do not take it over.
+
 ## Test first
 
 For any behaviour change:

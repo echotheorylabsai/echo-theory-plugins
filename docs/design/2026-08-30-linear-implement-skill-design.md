@@ -79,8 +79,8 @@ Anything a future edit is likely to touch lives in a reference file.
 1  GATE        show the delivery plan → wait for an explicit yes
 2  ISSUE       next unblocked issue only, in this phase's worktree: re-read →
                test-first → implement → independent review → commit → In Review
-3  CHECKPOINT  phase ships as one PR → merge → all its issues Done → clean up →
-               report, wait
+3  CHECKPOINT  phase ships: re-sync → PR → re-sync → merge → all its issues Done
+               → clean up → report → wait
 4  CLOSE       whole-project review, final verification, honest report
 ```
 
@@ -244,14 +244,18 @@ A specification change that alters requirements or behaviour is always material.
 The checkpoint gate and the merge are the same moment. Every issue in the phase is committed
 and `In Review`; now:
 
-1. Open the phase PR, listing each issue and its evidence.
-2. If a human must approve it, say so, report and wait. Do not start the next phase — its
+1. **Re-sync.** Fetch; if the integration branch moved, integrate it into the phase branch
+   and **re-run verification** — green from before the integration proves nothing. A
+   conflict is a stop.
+2. Open the phase PR, listing each issue and its evidence.
+3. If a human must approve it, say so, report and wait. Do not start the next phase — its
    worktree would be cut from a branch that does not contain this one.
-3. Once merged, confirm from the remote. Under a squash or rebase merge, confirm by content,
-   not commit ancestry.
-4. Move every issue in the phase to `Done`; update the project record.
-5. Clean up the worktree and branch.
-6. Report, and **wait** for a yes before the next milestone.
+4. **Re-sync again before merging** — it moves between opening and merging too. Once merged,
+   confirm from the remote. Under a squash or rebase merge, confirm by content, not commit
+   ancestry.
+5. Move every issue in the phase to `Done`; update the project record.
+6. Clean up the worktree and branch.
+7. Report, and **wait** for a yes before the next milestone.
 
 If the run stops mid-phase, the branch is retained with its completed issues on it and they
 stay `In Review`. The report must say which issues sit on an unmerged branch — none of them
@@ -393,7 +397,8 @@ either.
 | Deployment | Verified as a gate, never performed |
 | Resume | Re-prints the plan and re-asks; the gate belongs to the session |
 | Merge authority | Named in the step-1 plan; a human-approval repo routes through `In Review` |
-| Force | Never — on a branch or a worktree |
+| Force | Never — on a branch, a worktree, or a push |
+| Concurrency | `origin/<integration-branch>` is a moving target: re-sync before the worktree, before the PR and before the merge, and re-verify after each. A conflict with another agent's work is a stop |
 | Blocked state | Stays `In Progress` with a comment; the workspace has no `Blocked` |
 
 ---

@@ -20,9 +20,10 @@ file; `../../linear-sync/…` from inside `references/`.
 ```
 0  ADOPT       read the whole project + approved sources → state the model
 1  GATE        show the delivery plan → wait for an explicit yes
-2  ISSUE       next unblocked issue only: re-read → worktree → test-first →
-               implement → independent review → PR → merge → Linear → clean up
-3  CHECKPOINT  at each milestone boundary: report, wait
+2  ISSUE       next unblocked issue only, in this phase's worktree: re-read →
+               test-first → implement → independent review → commit → In Review
+3  CHECKPOINT  phase ships: re-sync → PR → re-sync → merge → all its issues Done
+               → clean up → report → wait
 4  CLOSE       whole-project review, final verification, honest report
 ```
 
@@ -121,8 +122,12 @@ proposes boundaries **of size, not of phase** — every second issue, or every i
 risky work — and has them confirmed here. That is a run-length decision, not an invented
 roadmap; nothing is written to Linear.
 
-**Name who merges.** If PRs need human approval, say so in the plan — it changes the flow
-in step 2.8.
+**Name who merges.** If PRs need human approval, say so in the plan — it changes the flow at
+the checkpoint.
+
+**Say if the repo is busy.** If other worktrees or recent branches suggest concurrent agents
+or people, note it: the integration branch will move under this run, and phases may need to
+be shorter.
 
 Only after the yes: open the ledger (`references/ledger.md`) and post **one** concise
 project status update — goal, order, dependencies, material risks or gates, next unblocked
@@ -137,11 +142,12 @@ changed since step 0.
 Method for steps 2–7 is in `references/execution-method.md`. **Read it before step 2.**
 
 1. **Restate** the smallest shippable outcome and its acceptance criteria in the ledger.
-2. **Isolate** — work in **this milestone's** worktree. At the *first* issue of a phase,
-   update the local integration branch from the remote and cut the worktree and branch from
-   it; later issues in the same phase reuse it. One milestone, one worktree, one branch, one
-   PR — one commit per issue inside it. Never implement on the integration branch. Commands
-   and naming: `execution-method.md`.
+2. **Isolate** — work in **this milestone's** worktree. One milestone, one worktree, one
+   branch, one PR; one commit per issue inside it. At the *first* issue of a phase, fetch
+   and update the local integration branch, then cut the worktree from it; later issues in
+   the same phase reuse it. **Other agents merge into that branch while you work** — it is
+   re-synced again before the PR and before the merge, never assumed still current. Never
+   implement on the integration branch. Commands and naming: `execution-method.md`.
 3. **Inspect** the owning code, tests, repo instructions and established patterns. Keep the
    design minimal — no speculative abstraction, no unrelated cleanup.
 4. **Set state** `In Progress`.
@@ -211,14 +217,18 @@ A specification change that alters requirements or behaviour is **always** mater
 
 Every issue in the phase is committed and `In Review`. Now the phase lands:
 
-1. **Open the PR** for the phase branch, listing each issue and its evidence.
-2. **If a human must approve it, say so, report, and wait.** Do not start the next phase —
+1. **Re-sync first.** Fetch; if the integration branch moved while you worked, integrate it
+   into the phase branch and **re-run verification** — green from before the integration
+   proves nothing. A conflict is a stop. See `references/execution-method.md`.
+2. **Open the PR** for the phase branch, listing each issue and its evidence.
+3. **If a human must approve it, say so, report, and wait.** Do not start the next phase —
    its worktree would be cut from a branch that does not contain this one.
-3. Once merged, **confirm from the remote** that it landed on the intended integration
-   branch. Under a squash or rebase merge, confirm by content, not commit ancestry.
-4. Move every issue in the phase to **`Done`**, and update the Linear project record.
-5. **Clean up** the worktree and branch per `references/execution-method.md`.
-6. Report to the user: issues shipped with their evidence, findings, risks, what comes next.
+4. **Re-sync again before merging** — it can move between opening and merging. Once merged,
+   **confirm from the remote** that it landed on the intended integration branch. Under a
+   squash or rebase merge, confirm by content, not commit ancestry.
+5. Move every issue in the phase to **`Done`**, and update the Linear project record.
+6. **Clean up** the worktree and branch per `references/execution-method.md`.
+7. Report to the user: issues shipped with their evidence, findings, risks, what comes next.
 
 **Wait for a yes before starting the next milestone.**
 
@@ -262,4 +272,7 @@ gate**, unless the approved workflow explicitly reclassified it as a separate fo
 | "The reviewer said it was done" | Read the diff and the evidence yourself. A claim is not a verification. |
 | "I'll tidy the rest of this file while I'm here" | Unrelated cleanup is scope nobody approved. |
 | "The phase PR is up, I'll start the next phase" | The next worktree branches off a merge that has not happened. Wait. |
+| "I fetched at the start of the phase, so I am current" | Other agents have merged since. Re-fetch before the PR and before the merge. |
+| "The merge was clean, so the tests still pass" | A clean merge can still be semantically broken. Re-run them. |
+| "This conflict is obviously mine to resolve" | It is someone else's change. Stop and ask unless it carries no meaning. |
 | "It mostly works — I'll report success" | Report the gap plainly. A false completion claim costs more than the gap. |

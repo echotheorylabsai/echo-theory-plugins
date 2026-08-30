@@ -84,7 +84,9 @@ data — and the code forces it. If it has to be argued, it is material.
 | Grind | Three failed verification cycles on one issue stops the run. |
 | Merge past a human | If PRs need approval, it opens one, sets `In Review`, and waits. |
 | Deploy | Deployment is a gate it verifies, never an action it takes. |
-| Force-delete anything | A branch that resists a safe delete is kept and reported. |
+| Force-delete anything | A branch that resists a safe delete is kept and reported. Never a force-push either. |
+| Assume the branch stood still | Other agents merge while it works. It re-syncs before the PR and before the merge, and re-runs the tests each time — a clean merge can still be semantically broken. |
+| Resolve someone else's conflict | A collision with another agent's change is a stop, unless the conflict carries no meaning. |
 
 ### Surviving a long run
 
