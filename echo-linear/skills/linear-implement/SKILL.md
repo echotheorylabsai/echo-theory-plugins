@@ -101,7 +101,7 @@ the yes** — the ledger included.
 ```
 DELIVERY PLAN — Content Intelligence v2
 Baseline     docs/superpowers/plans/2026-08-20-content-v2-plan.md @ abc1234 (pushed)
-Integration  main · clean · one worktree, branch and PR per issue
+Integration  main · clean · one worktree, branch and PR per milestone
 
 Phase A · Instrument
   ECH-41  [Phase A.1] Record the baseline    Backlog
@@ -137,9 +137,11 @@ changed since step 0.
 Method for steps 2–7 is in `references/execution-method.md`. **Read it before step 2.**
 
 1. **Restate** the smallest shippable outcome and its acceptance criteria in the ledger.
-2. **Isolate** — update the local integration branch from the remote first, then cut a
-   worktree and branch from it. One issue, one worktree, one branch, one PR. Never
-   implement on the integration branch. Commands and naming: `execution-method.md`.
+2. **Isolate** — work in **this milestone's** worktree. At the *first* issue of a phase,
+   update the local integration branch from the remote and cut the worktree and branch from
+   it; later issues in the same phase reuse it. One milestone, one worktree, one branch, one
+   PR — one commit per issue inside it. Never implement on the integration branch. Commands
+   and naming: `execution-method.md`.
 3. **Inspect** the owning code, tests, repo instructions and established patterns. Keep the
    design minimal — no speculative abstraction, no unrelated cleanup.
 4. **Set state** `In Progress`.
@@ -152,11 +154,10 @@ Method for steps 2–7 is in `references/execution-method.md`. **Read it before 
 7. **Review independently** — read-only, clean context, given the diff, the tests, the
    approved acceptance criteria and the evidence, never your reasoning. Harness fallbacks:
    `execution-method.md`.
-8. **Ship** — open the PR. If a human must approve it, set `In Review`, report, and **wait**
-   — do not start the next issue. Once merged, confirm from the remote that it merged and
-   that the integration branch contains the result.
-9. **Record** — one evidence comment on the issue, then set its state truthfully.
-10. **Clean up** per `execution-method.md`, and only once the merge is confirmed.
+8. **Land it on the phase branch** — commit, with the issue key in the message.
+9. **Record** — one evidence comment on the issue, then set it `In Review`: the work is done
+   and reviewed, but nothing has merged yet.
+10. **Next issue in this phase**, from step 1. The last issue of the phase goes to step 3.
 
 Implement **only approved scope**. Take no destructive, irreversible, production, provider
 or external-account action without explicit authorization and satisfied gates.
@@ -164,9 +165,9 @@ or external-account action without explicit authorization and satisfied gates.
 Move on only when the current issue is complete and its real dependencies permit it.
 
 **States, evidence comments and status updates:** `references/linear-updates.md`. In short —
-`In Progress` while working, `In Review` while waiting on a human, `Blocked or stopped`
-stays `In Progress` with a comment, `Done` only after criteria, verification, review and
-merge all pass. **A blocked issue is never Done.**
+`In Progress` while working, `In Review` once its work is committed to the phase branch,
+`Done` only when the phase PR has merged and been confirmed. Blocked or stopped stays
+`In Progress` with a comment. **A blocked issue is never Done.**
 
 **Grind limit.** A *verification cycle* is one implement-then-verify attempt after the
 first red test. Three failed cycles on one issue **stops the run**: commit the work in
@@ -206,12 +207,24 @@ issue.
 
 A specification change that alters requirements or behaviour is **always** material.
 
-## 3. Milestone checkpoint
+## 3. Milestone checkpoint — ship the phase
 
-At each boundary, stop. Post a project status update, then report to the user: issues
-completed with their evidence, findings, risks, and what comes next.
+Every issue in the phase is committed and `In Review`. Now the phase lands:
+
+1. **Open the PR** for the phase branch, listing each issue and its evidence.
+2. **If a human must approve it, say so, report, and wait.** Do not start the next phase —
+   its worktree would be cut from a branch that does not contain this one.
+3. Once merged, **confirm from the remote** that it landed on the intended integration
+   branch. Under a squash or rebase merge, confirm by content, not commit ancestry.
+4. Move every issue in the phase to **`Done`**, and update the Linear project record.
+5. **Clean up** the worktree and branch per `references/execution-method.md`.
+6. Report to the user: issues shipped with their evidence, findings, risks, what comes next.
 
 **Wait for a yes before starting the next milestone.**
+
+If the run stops mid-phase — grind limit, a blocked decision, a rejected PR — the phase
+branch is retained with its completed issues on it, and they stay `In Review`. Say plainly
+which issues are on an unmerged branch; none of them has shipped.
 
 ## 4. Close honestly
 
@@ -239,7 +252,8 @@ gate**, unless the approved workflow explicitly reclassified it as a separate fo
 |---|---|
 | "The project is clear enough, I'll just start" | Step 1 gates hours of work and a shared workspace. Print the plan, wait. |
 | "It's a resume, the gate already happened" | It happened in a session that is gone. Re-print, re-confirm. |
-| "It's a small fix, no need for a worktree" | The integration branch is not a workspace. One issue, one branch. |
+| "It's a small fix, no need for a worktree" | The integration branch is not a workspace. One phase, one branch. |
+| "This issue is finished, I'll mark it Done" | Nothing has merged yet. `In Review` until the phase PR lands. |
 | "This change is obviously what they meant" | If you have to argue it is non-material, it is material. Stop and ask. |
 | "The source is wrong, I'll implement it properly" | That is the drift this skill exists to prevent. Comment the evidence, then ask. |
 | "Tests pass, so it's Done" | Done needs criteria, review and a merged PR. Tests are evidence about code, nothing more. |
@@ -247,5 +261,5 @@ gate**, unless the approved workflow explicitly reclassified it as a separate fo
 | "I'll write the test after — it's faster" | The failing test is what proves the requirement exists. First, or not at all. |
 | "The reviewer said it was done" | Read the diff and the evidence yourself. A claim is not a verification. |
 | "I'll tidy the rest of this file while I'm here" | Unrelated cleanup is scope nobody approved. |
-| "The PR is up, I'll start the next issue" | The next worktree branches off a merge that has not happened. Wait. |
+| "The phase PR is up, I'll start the next phase" | The next worktree branches off a merge that has not happened. Wait. |
 | "It mostly works — I'll report success" | Report the gap plainly. A false completion claim costs more than the gap. |

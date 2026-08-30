@@ -58,9 +58,10 @@ turns out to be wrong:
    missing dependency — and it stops.
 1. **Start gate** — prints a delivery plan and waits. Nothing reaches code, disk or Linear
    first.
-2. **Execute** — the next unblocked issue only: its own worktree, a failing test first, an
-   independent review, a PR, a merge, a truthful Linear state, then cleanup.
-3. **Checkpoint** — stops at every milestone boundary and waits before the next phase.
+2. **Execute** — the next unblocked issue only, in the current phase's worktree: a failing
+   test first, an independent review, its own commit, a truthful Linear state.
+3. **Checkpoint** — the phase ships as one PR, merges, and every issue in it goes Done.
+   Then it stops and waits before the next phase.
 4. **Close** — re-reads everything from Linear, runs a final whole-project review, and
    reports the gaps plainly.
 
@@ -88,7 +89,7 @@ data — and the code forces it. If it has to be argued, it is material.
 ### Surviving a long run
 
 Progress, decisions and open findings go to `.linear-implement/<slug>.md` — gitignored, kept
-outside the per-issue worktrees. It is a cache, not the record: if it is lost, it rebuilds
+outside the per-phase worktrees. It is a cache, not the record: if it is lost, it rebuilds
 from Linear. A resumed run re-prints its plan and asks again; the gate belongs to the
 session, not the project.
 

@@ -12,9 +12,9 @@ There is no `Blocked` state. Full workspace facts:
 | Situation | State |
 |---|---|
 | Actively working the issue | `In Progress` — set after the re-read, before the first edit |
-| PR open, waiting on a human reviewer or merger | `In Review` |
-| Stopped: blocked, awaiting a decision, or grind limit hit | **Leave `In Progress`** and say why in a comment. Moving it back reads as abandoned; moving it to `In Review` claims a review that does not exist |
-| Criteria met, verification passed, review passed, PR merged and confirmed | `Done` |
+| Its work is committed to the phase branch and independently reviewed, but the phase PR has not merged | `In Review` — this is where most finished issues sit until the checkpoint |
+| Stopped: blocked, awaiting a decision, or grind limit hit | **Leave `In Progress`** and say why in a comment. Moving it back reads as abandoned; moving it to `In Review` claims work that is not finished |
+| The phase PR merged and was confirmed from the remote | `Done` — set for every issue in that phase at the checkpoint |
 | Unstarted | `Backlog` / `Todo` — leave as found |
 | Found `Canceled` or `Duplicate` at step 0 | Skip it. Do not resurrect it; say so in the delivery plan |
 | Found already `In Progress` or `Done` at step 0 | Stop and ask — **unless** the ledger for this project accounts for it, in which case it is your own earlier run and you resume |
@@ -33,16 +33,20 @@ Creating Linear artifacts is `linear-sync`'s job, not this skill's.
 
 ## Evidence comment
 
-**One per issue, at completion.** Concise.
+**One per issue**, written when its work is committed to the phase branch — before the PR
+exists. Concise.
 
 ```markdown
-**Done** · PR [#123](https://github.com/…/pull/123) merged into `main`
+**Complete** · committed to `feat/phase-a-instrument` · ships with the Phase A PR
 
 **Verification** — 14 tests passing (`pytest tests/ingest`), full suite green
 **Review** — independent review passed; one finding fixed (unhandled empty response)
 **Decision** — retry budget set to 3, per plan §Phase A
 **Gate** — none outstanding
 ```
+
+At the checkpoint, the phase PR link goes in the **project** status update, not in a second
+comment on every issue.
 
 Include `Decision` and `Gate` lines only when there is one. Omit rather than pad.
 

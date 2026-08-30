@@ -3,16 +3,23 @@
 Method serves the approved plan. It never overrides it. If a method here conflicts with the
 approved sources, the sources win and you stop and say so.
 
-## Isolation — one issue, one worktree, one branch, one PR
+## Isolation — one milestone, one worktree, one branch, one PR
 
-**Update the local integration branch before every worktree.** The previous issue merged on
-the remote; your local copy does not know that yet. Skipping this cuts the next issue from
-stale code and its PR will conflict with or revert the last one.
+**The unit is the milestone, not the issue.** Every issue in a phase is built in the same
+worktree, each as its own commit, and the whole phase ships as one PR at the checkpoint.
+
+Why: a PR per issue multiplies CI runs and merges — six issues means six PR pipelines plus
+six merge pipelines. Per milestone that is two. The phase is also already the unit the user
+approves at step 3, so the merge and the checkpoint gate land together.
+
+**Cut the worktree once per milestone**, after the previous milestone's PR merged. Update
+the local integration branch first — your local copy does not know about that merge yet, and
+skipping it cuts the phase from stale code.
 
 ```
 git fetch origin
 git checkout <integration-branch> && git pull --ff-only
-git worktree add ../<repo>-ech-41 -b feat/ech-41-<slug> <integration-branch>
+git worktree add ../<repo>-phase-a -b feat/<phase-slug> <integration-branch>
 ```
 
 **Do not reach for `git branch -f`.** Git refuses to force-update a branch that is checked
@@ -22,11 +29,23 @@ with exit 128 before anything is cut. `checkout` + `pull --ff-only` is the worki
 If `pull --ff-only` refuses, the local branch has commits the remote does not. **Stop and
 ask** — do not merge, rebase or reset your way past it.
 
-Branch name: `feat/<issue-key-lowercased>-<short-slug>`. Use the repo's own convention if it
-has one — check recent branches and any contributing guide first.
+Branch name: `feat/<phase-slug>`, e.g. `feat/phase-a-instrument`. A project with no
+milestones uses the checkpoint boundaries confirmed at step 1 as its branch boundaries — the
+two are the same thing. Use the repo's own convention if it has one; check recent branches
+and any contributing guide first.
+
+**Commit per issue.** Each issue gets its own commit or commits on the phase branch, with
+the issue key in the message, so the phase PR stays reviewable issue by issue.
 
 Work happens inside that worktree only. The **primary checkout** holds the ledger and is
-where you run worktree removal from — "not from inside the worktree you are removing".
+where you run worktree removal from — not from inside the worktree you are removing.
+
+### What this costs
+
+Issues inside a phase see each other's work immediately — no fetch, no merge between them.
+But recovery is coarser: if a phase PR is rejected, **all of its issues roll back together.**
+Keep phases small enough that this is acceptable; `linear-sync` already targets 1–4 issues
+per milestone.
 
 ## Test first
 
@@ -100,8 +119,10 @@ source is wrong.
 
 ## Post-merge cleanup
 
-Runs per issue, and **only after the merge is confirmed** — that it merged into the intended
-integration branch and that the branch contains the result.
+Runs **once per milestone**, and only after the phase PR's merge is confirmed — that it
+merged into the intended integration branch and that the branch contains the result.
+
+Nothing is cleaned up mid-phase. The worktree stays until its whole phase has landed.
 
 **Under a squash or rebase merge, commit ancestry will say the branch is unmerged even
 though the content landed.** Confirm by content — the PR shows merged on the remote and the
@@ -118,10 +139,10 @@ Then:
 1. Confirm the exact dedicated feature-worktree path — **never the primary checkout** — the
    feature branch, the integration branch, and that no remaining worktree has the feature
    branch checked out.
-2. Confirm the issue's Linear record is accurate — the evidence comment from step 2.9 names
-   the merged PR and any deployment evidence. Re-read it. Add a comment here **only** if
-   something new is true: the merge landed differently, or an artifact is being retained.
-   Do not post a second "done" comment.
+2. Move every issue in the phase from `In Review` to `Done`, and confirm each record is
+   accurate — the evidence comment written when its work completed should now name the
+   merged phase PR. Re-read them. Add a comment **only** if something new is true: the merge
+   landed differently, or an artifact is being retained. Do not post second "done" comments.
 3. From the primary checkout, remove **only that exact worktree** — `git worktree remove
    <path>`. If it refuses because of untracked build artifacts (`__pycache__`,
    `.pytest_cache`, coverage output), delete those files and retry. **Never

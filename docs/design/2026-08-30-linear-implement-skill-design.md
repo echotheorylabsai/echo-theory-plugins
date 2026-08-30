@@ -25,7 +25,7 @@ Three things go wrong when a coding agent is pointed at that project without str
 ## 2. Goal
 
 One skill that takes an approved Linear project and delivers its **goal** — issue by
-issue, test-first, each independently reviewed and merged — pausing for human approval
+issue, test-first, each independently reviewed, shipping a phase at a time — pausing for approval
 before it starts and at every milestone boundary, and reporting honestly at the end.
 
 ## 3. Non-goals (v1)
@@ -77,9 +77,10 @@ Anything a future edit is likely to touch lives in a reference file.
 ```
 0  ADOPT       read the whole project + approved sources → state the model
 1  GATE        show the delivery plan → wait for an explicit yes
-2  ISSUE       next unblocked issue only: re-read → worktree → test-first →
-               implement → independent review → PR → merge → Linear → clean up
-3  CHECKPOINT  at each milestone boundary: report, wait
+2  ISSUE       next unblocked issue only, in this phase's worktree: re-read →
+               test-first → implement → independent review → commit → In Review
+3  CHECKPOINT  phase ships as one PR → merge → all its issues Done → clean up →
+               report, wait
 4  CLOSE       whole-project review, final verification, honest report
 ```
 
@@ -139,7 +140,7 @@ Linear** before it.
 ```
 DELIVERY PLAN — Content Intelligence v2
 Baseline     docs/superpowers/plans/2026-08-20-content-v2-plan.md @ abc1234 (pushed)
-Integration  main · clean · one worktree, branch and PR per issue
+Integration  main · clean · one worktree, branch and PR per milestone
 
 Phase A · Instrument
   ECH-41  [Phase A.1] Record the baseline    Backlog
@@ -187,18 +188,16 @@ Linear record and every linked source — either may have changed since step 0.
 7. **Review independently** — read-only, clean context, given the diff, the tests, the
    approved acceptance criteria and the evidence, never the writer's reasoning. Fix
    material findings, re-verify, re-review after material changes.
-8. **Ship** — open the PR. If a human must approve it, set `In Review`, report and wait;
-   do not start the next issue. Once merged, confirm from the remote. Under a squash or
-   rebase merge, confirm by content, not by commit ancestry.
-9. **Record** — **one** evidence comment on the issue, then set state truthfully. Cleanup
-   re-reads that comment rather than posting a second one.
-10. **Clean up** per `execution-method.md`, and only after the merge is confirmed.
+8. **Land it** — commit to the phase branch, with the issue key in the message.
+9. **Record** — **one** evidence comment on the issue, then set it `In Review`.
+10. **Next issue in this phase.** The last one goes to step 3, where the phase ships.
 
-**Truthful states.** `In Progress` while working. `In Review` while awaiting a human or a
-PR review that cannot be completed here. A blocked or stopped issue **stays `In Progress`
+**Truthful states.** `In Progress` while working. `In Review` once the issue's work is
+committed to the phase branch and reviewed — nothing has merged yet, so this is where most
+finished issues sit until the checkpoint. A blocked or stopped issue **stays `In Progress`
 with a comment** — the workspace has no `Blocked` state and inventing one is forbidden.
-`Done` only when acceptance criteria, verification, independent review and the merge have
-all passed. A blocked issue is never Done.
+`Done` only when the phase PR has merged and been confirmed, set for every issue in the
+phase at once. A blocked issue is never Done.
 
 **Grind limit.** A *verification cycle* is one implement-then-verify attempt **after** the
 first deliberately-failing test; the red test is not a strike. Three failed cycles on one
@@ -240,11 +239,27 @@ If it has to be argued, it is material.
 
 A specification change that alters requirements or behaviour is always material.
 
-### 6.5 Step 3 — milestone checkpoint
+### 6.5 Step 3 — milestone checkpoint, where the phase ships
 
-At each boundary: post a project status update, report to the user (issues completed with
-evidence, findings, risks, what is next), and **wait** for a yes before the next
-milestone.
+The checkpoint gate and the merge are the same moment. Every issue in the phase is committed
+and `In Review`; now:
+
+1. Open the phase PR, listing each issue and its evidence.
+2. If a human must approve it, say so, report and wait. Do not start the next phase — its
+   worktree would be cut from a branch that does not contain this one.
+3. Once merged, confirm from the remote. Under a squash or rebase merge, confirm by content,
+   not commit ancestry.
+4. Move every issue in the phase to `Done`; update the project record.
+5. Clean up the worktree and branch.
+6. Report, and **wait** for a yes before the next milestone.
+
+If the run stops mid-phase, the branch is retained with its completed issues on it and they
+stay `In Review`. The report must say which issues sit on an unmerged branch — none of them
+has shipped.
+
+**The cost of this choice.** Recovery is coarser than per-issue: a rejected phase PR rolls
+back all of its issues together. `linear-sync` already targets 1–4 issues per milestone,
+which keeps that blast radius small.
 
 ### 6.6 Step 4 — close honestly
 
@@ -275,8 +290,8 @@ record has to be concrete rather than "a ledger or equivalent".
   repo. On first use the skill confirms the entry exists in whatever repo it is running
   against and adds it if not — otherwise the ledger dirties the checkout and trips step 0's
   own stop condition.
-- **Not in the worktree** — per-issue worktrees are removed at the end of each issue and
-  would take the ledger with them.
+- **Not in the worktree** — per-phase worktrees are removed at the end of each milestone
+  and would take the ledger with them.
 - **Created after the step-1 gate**, never before. Nothing reaches disk while the user is
   still being asked.
 - **Not authoritative.** Linear is the record. If the ledger is lost, rebuild it from
@@ -368,7 +383,7 @@ either.
 | Decision | Choice |
 |---|---|
 | Component | Second skill in `echo-linear`, not an agent — approval gates need the main session |
-| Branch model | One worktree, branch and PR **per issue** |
+| Branch model | One worktree, branch and PR **per milestone**; one commit per issue inside it. Chosen over per-issue: six issues in two phases is two PR pipelines and two merge pipelines instead of twelve, and the merge lands on the checkpoint gate that already existed. Cost: a rejected phase PR rolls back all its issues together |
 | Autonomy | Autonomous within a milestone; a gate at every milestone boundary |
 | Start gate | Always, including a single-issue project |
 | Material change | Default is material; non-material requires all five conditions |

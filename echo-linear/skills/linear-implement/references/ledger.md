@@ -10,13 +10,18 @@ The **slug is the Linear project identifier**, not its name — stable, unique, 
 every session. Fall back to the name lowercased with non-alphanumerics collapsed to `-` only
 if the project has no identifier, and record which you used in the header.
 
-- **Not in a worktree** — per-issue worktrees are removed at the end of each issue and would
-  take the ledger with them.
+- **Not in a worktree** — per-phase worktrees are removed at the end of each milestone and
+  would take the ledger with them.
 - **Never committed.** On first use, create the directory *and* confirm `.linear-implement/`
-  is ignored by the target repo. If it is not, add the line to `.gitignore`, **commit that
-  one-line change to the integration branch**, and say you did. An untracked ledger — or an
-  uncommitted `.gitignore` edit — otherwise dirties the checkout and trips step 0's own stop
-  condition on the next run.
+  is ignored by the target repo.
+
+  If it is not, add the line to `.gitignore` and **fold that one-line change into the first
+  phase's PR** — never commit it straight to the integration branch. A direct commit skips
+  review and fails outright on a protected branch. Mention it in the step-1 plan so the user
+  is not surprised by an unrelated line in that PR.
+
+  Until it merges, the ledger and that `.gitignore` edit are the only uncommitted changes
+  step 0 tolerates.
 
 **Created only after the step-1 gate passes.** Nothing reaches disk while the user is still
 being asked.
@@ -42,17 +47,22 @@ Checkpoints  after Phase A · after Phase B
 
 ## Order
 
-| # | Issue | Title | State | PR | Artifacts retained |
+| # | Issue | Title | Phase | State | Phase PR |
 |---|---|---|---|---|---|
-| 1 | ECH-41 | [Phase A.1] Record the baseline | DONE | #123 | branch (squash merge) |
-| 2 | ECH-42 | [Phase A.2] Seal Day 0 | IN PROGRESS | — | — |
-| 3 | ECH-43 | [Phase B.1] Change log | PENDING | — | — |
+| 1 | ECH-41 | [Phase A.1] Record the baseline | A | IN REVIEW | not opened |
+| 2 | ECH-42 | [Phase A.2] Seal Day 0 | A | IN PROGRESS | — |
+| 3 | ECH-43 | [Phase B.1] Change log | B | PENDING | — |
+
+## Phase A · Instrument
+
+Worktree   ../echo-hq-phase-a
+Branch     feat/phase-a-instrument
+PR         not opened — opens at the checkpoint
+Retained   —
 
 ## ECH-42 — Seal Day 0
 
 Outcome    The Day 0 snapshot is written once and cannot be overwritten.
-Worktree   ../echo-hq-ech-42
-Branch     feat/ech-42-seal-day-0
 Cycles     1 of 3
 
 Criteria
@@ -82,14 +92,15 @@ close.
 | Point | Write |
 |---|---|
 | Immediately after the step-1 gate | Header, order table, checkpoints |
-| Start of an issue | Its section: outcome, criteria, worktree, branch |
+| Start of a phase | Its section: worktree, branch |
+| Start of an issue | Its section: outcome, criteria |
 | A decision made | Under `Decisions`, with the evidence |
 | A review finding | Under `Findings`, unchecked |
 | A finding resolved | Check it off |
 | A failed verification cycle | Increment `Cycles` |
 | Blocked, or the grind limit hit | `Stopped` — what happened, what is awaited |
-| End of an issue | State, PR number, retained artifacts, criteria all checked |
-| Each checkpoint | Update `Carried forward` |
+| End of an issue | State `IN REVIEW`, criteria all checked |
+| Each checkpoint | Phase PR number, every issue to `DONE`, retained artifacts, `Carried forward` |
 
 ## Resuming
 
