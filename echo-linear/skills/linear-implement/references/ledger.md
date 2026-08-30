@@ -16,10 +16,14 @@ if the project has no identifier, and record which you used in the header.
   is ignored by the target repo.
 
   If it is not, **make and commit that `.gitignore` edit inside the first phase's worktree**,
-  so it rides along in that phase's PR. Never edit `.gitignore` in the primary checkout: a
-  later `git pull --ff-only` aborts there the moment anyone upstream touches the same file,
-  and it is untracked work nothing will ever carry. Never commit it straight to the
-  integration branch either — that skips review and fails outright on a protected branch. Mention it in the step-1 plan so an unrelated line in that PR is not a surprise.
+  so it rides along in that phase's PR, and say so in the step-1 plan — an unrelated line in
+  someone's PR should not be a surprise. Commit it on its own, `chore: ignore
+  .linear-implement/`; it belongs to no issue.
+
+  Never edit `.gitignore` in the primary checkout: a later `git pull --ff-only` aborts there
+  the moment anyone upstream touches the same file, and it is untracked work nothing will ever
+  carry. Never commit it straight to the integration branch either — that skips review and
+  fails outright on a protected branch.
 
   Until that PR merges, the ledger directory is untracked in the primary checkout. That is
   expected, and it is the only uncommitted thing step 0 tolerates. An untracked directory
@@ -114,7 +118,9 @@ After any interruption — a new session, a context reset, a stopped run:
    comments and discrepancy comments** carry the facts; the approval records repopulate
    `Decisions`, so read every issue's comments, not just its description. Say that you
    rebuilt it, and what did not survive.
-2. Take the rebuilt ledger as the account of any issue already `In Progress` or `Done`.
+2. Take the rebuilt ledger as the account of any issue already `In Progress`, `In Review` or
+   `Done`. `In Review` is the normal resume state — most finished issues sit there between
+   their commit and the checkpoint.
    Only stop and ask if Linear shows work the rebuilt record cannot explain — for example an
    issue `In Progress` with no evidence comment and no branch.
 3. **Re-read the project and every issue from Linear.**
@@ -137,9 +143,10 @@ After any interruption — a new session, a context reset, a stopped run:
    over. Only an issue with no evidence comment and no commit is genuinely unstarted.
 8. If the phase branch and worktree still exist, reuse them. Cut a new worktree only when
    starting a phase that has none.
-9. Then continue from step 2. **Re-run the phase's pre-flight if the phase has not started or
-   a phase boundary was crossed**; if you are resuming mid-phase and it already ran against
-   this same merged code, only the resumed issue's own re-read is needed.
+9. Then continue where item 7 sent you — checkpoint step 3 for a built phase, otherwise step
+   2. **Re-run the phase's pre-flight if the phase has not started or a phase boundary was
+   crossed**; resuming mid-phase where it already ran against this same merged code needs only
+   the resumed issue's own re-read.
 
 Never resume from the ledger alone. It records what you intended; Linear records what
 happened.

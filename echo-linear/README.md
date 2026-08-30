@@ -3,10 +3,28 @@
 Turn what was **approved** in a working session into Linear artifacts a product manager
 can read and a coding agent can act on alone — then build them.
 
+## Requirements
+
+- **The Linear MCP server**, configured and authenticated. Both skills stop without it.
+- **A git repository** for `linear-implement`, with a remote it can push to.
+
 Written to work in Claude Code and Codex — no harness-specific tool names, and a stated
-fallback wherever subagents are assumed. Both need the Linear MCP configured. **Only the
-Claude Code install path is packaged here**; Codex users load the skill files directly, and
-that path has not been verified yet.
+fallback wherever subagents are assumed. The packaged install path is Claude Code's; on Codex,
+point at the skill directory directly and keep the plugin folder intact, since the two skills
+reference each other's files.
+
+## Install
+
+```bash
+claude plugin marketplace add echotheorylabsai/echo-theory-plugins
+claude plugin install echo-linear --scope project     # or --scope user
+```
+
+Session-local, without installing:
+
+```bash
+claude --plugin-dir /path/to/echo-linear
+```
 
 ```
 discussion / spec / plan  ──linear-sync──▶  Linear project  ──linear-implement──▶  merged PRs
@@ -43,8 +61,15 @@ simple sequential work. Dependencies are set as real Linear blocking relations.
 
 ### Safety
 
-Updates never rewrite a description. New information is prepended as a dated callout, so
-anything you wrote by hand survives.
+Updates to **issues and projects** never rewrite a description — new information is prepended
+as a dated callout, so anything you wrote by hand survives. Linear supports partial edits on
+both, and the skill uses them.
+
+**Milestones are the exception, and it matters.** Linear has no partial edit for a milestone
+description; saving one replaces the whole body. The skill therefore reads the complete body
+first and re-sends it verbatim beneath the new note — and **stops and asks** if that body is
+long, came back truncated, or contains anything it cannot reproduce exactly. Losing it is not
+recoverable.
 
 **Example prompts**:
 ```
@@ -76,9 +101,10 @@ turns out to be wrong:
    first.
 2. **Execute** — the next unblocked issue only, in the current phase's worktree: a failing
    test first, an independent review, its own commit, a truthful Linear state.
-3. **Checkpoint** — the phase ships as one PR. If a human must approve it, it hands you the
-   link and waits. Once merged, every issue in the phase goes Done, the docs are reconciled,
-   and it waits again before the next phase.
+3. **Checkpoint** — the docs are brought up to date *inside* the phase's branch so they ship
+   with the code, then the phase goes up as one PR. **A human merges unless you said
+   otherwise.** Once merged, every issue in the phase goes Done, the Linear records are
+   reconciled, and it waits before the next phase.
 4. **Close** — re-reads everything from Linear, reconciles every doc against the code, runs
    a final whole-project review, and reports the gaps plainly.
 
@@ -124,9 +150,14 @@ data — and the code forces it. If it has to be argued, it is material.
 "Build the issues in <linear project URL>"
 "Start building ECH-41"                    ← resolves to its parent project first
 "Continue implementing Content Intelligence v2"
-"The Phase A PR merged — carry on"
-"Skip ECH-42 and continue with the rest"
 ```
+
+Those start or resume a run. **"The Phase A PR merged — carry on"** and **"skip ECH-42"** are
+answers to something it asked you, not ways to begin — see the table below.
+
+**Before you start**: commit or stash anything in progress. A dirty working tree in your main
+checkout stops the run — it needs a clean base to cut worktrees from. It will also ask to add
+one `.gitignore` line for its own progress notes, and will tell you so in the plan.
 
 **What happens next**: it reads the whole project and the sources it links, then prints a
 `DELIVERY PLAN` and waits. It stops again at every phase boundary, and whenever the code
@@ -176,8 +207,9 @@ Session 3   "continue implementing Content Intelligence v2"
 Session 3 re-asks because **the approval belongs to the session, not the project.** Consent
 given three days ago is not consent for what happens now.
 
-If you lose the thread, ask: *"What's the status of the Content Intelligence project?"* — it
-reads Linear and tells you which phase, what's blocking, and what it needs from you.
+If you lose the thread, say *"continue implementing Content Intelligence v2"*. It reads the
+project fresh, works out where things stand, and re-prints the plan for what remains — so the
+answer to "where are we?" arrives before it asks to carry on.
 
 ## Design
 

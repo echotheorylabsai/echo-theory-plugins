@@ -12,9 +12,13 @@ Why: a PR per issue multiplies CI runs and merges — six issues means six PR pi
 six merge pipelines. Per milestone that is two. The phase is also already the unit the user
 approves at step 3, so the merge and the checkpoint gate land together.
 
-**Cut the worktree once per milestone**, after the previous milestone's PR merged. Update
-the local integration branch first — your local copy does not know about that merge yet, and
+**Cut the worktree once per milestone**, after the previous milestone's PR merged. Update the
+local integration branch first — your local copy does not know about that merge yet, and
 skipping it cuts the phase from stale code.
+
+If the branch already exists — a crashed session left it behind — attach to it rather than
+recreating it: `git worktree add <path> <existing-branch>`, **without `-b`**, which would fail
+on the existing name.
 
 ```
 git fetch origin
@@ -241,7 +245,7 @@ Then:
    feature branch, the integration branch, and that no remaining worktree has the feature
    branch checked out.
 2. Confirm each issue's record is accurate — the states were already set to `Done` at
-   checkpoint step 5; do not set them again. Re-read them. Add a comment **only** if
+   checkpoint item 6; do not set them again. Re-read them. Add a comment **only** if
    something new is true: the merge landed differently, or an artifact is being retained. Do
    not post second "done" comments — the phase PR link lives in the project status update.
 3. From the primary checkout, remove **only that exact worktree** — `git worktree remove
@@ -257,8 +261,8 @@ Then:
    *remote-tracking ref*, not by the integration branch actually containing the work. So it
    will cheerfully delete a branch whose commits never landed.
 
-   **Therefore: confirm the merge by content first (item 0 above), and treat that as the
-   safety check — not `-d`'s exit code.** Read the warning; if it names a remote ref rather
+   **Therefore: confirm the merge by content first — the paragraph opening this section — and
+   treat that as the safety check, not `-d`'s exit code.** Read the warning; if it names a remote ref rather
    than your integration branch, you have only proved the branch reached the remote.
 
    If `-d` does refuse — the remote branch was deleted and pruned, so git can no longer see it
@@ -281,7 +285,7 @@ This skill runs in Claude Code and Codex.
 | Capability | How to treat it |
 |---|---|
 | git worktrees, branches, test runners | Universal. Use directly. |
-| PR creation and merge | Assume nothing. Detect the host's CLI (`gh` or equivalent) and whether it is authenticated. If there is none, or the branch is protected, say so in the step-1 plan and route through `In Review` instead of merging. |
+| PR creation and merge | Assume nothing. Detect the host's CLI (`gh` or equivalent) and whether it is authenticated. **Detection is capability, never permission** — merge only if the step-1 plan granted it. No CLI, a protected branch, or no granted authority: say so in the plan and wait at the checkpoint instead of merging. |
 | Superpowers skills — worktrees, TDD, subagent-driven development, code review, verification | Use **where present**. The discipline is the requirement; the skill is the upgrade. |
 | Subagents | Claude Code has them; assume Codex may not. Fall back to an explicit fresh-context pass with the same brief. |
 | Linear operations | Name by capability, never by harness-specific tool name. |

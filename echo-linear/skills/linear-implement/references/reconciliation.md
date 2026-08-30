@@ -9,12 +9,18 @@ once more at the close. A project with no milestones uses the batches confirmed 
 gate as its phases; it does not skip reconciliation for want of a roadmap.
 
 ```
-before phase ──▶ build ──▶ ship ──▶ after phase ──▶ … ──▶ close
-   PRE-FLIGHT                        POST-FLIGHT          FULL PASS
-   is the plan still                 does the doc say     does everything
-   true for what is                  what actually        describe what
-   about to be built?                shipped?             was built?
+before phase ──▶ build ──▶ DOCS ──▶ PR ──▶ merge ──▶ LINEAR ──▶ … ──▶ close
+  PRE-FLIGHT              reconcile         reconcile          FULL PASS
+  is the plan still       git-tracked       issues,            does everything
+  true for what is        files, in the     milestone,         describe what
+  about to be built?      worktree          project            was built?
 ```
+
+**Reconciliation at a checkpoint happens in two halves, on either side of the merge.**
+Git-tracked files — the plan, the spec, repo docs — are edited **in the worktree and committed
+to the phase branch before the PR opens**, so they ship with the code they describe. There is
+no legal place to commit them afterwards. Linear records are updated **after** the merge,
+because they cite the merged PR and no git is involved.
 
 ---
 
@@ -74,9 +80,11 @@ Building against a stale criterion produces work that passes its issue and fails
 
 ---
 
-## Post-flight — after a phase merges
+## Post-flight — the two halves
 
-What shipped is now fact. Make the record match it.
+What is about to ship is already known. Make the record match it.
+
+### Before the PR opens — in the worktree, committed to the phase branch
 
 **Classify every difference against the table above first.** Only differences that landed in
 its two *Record it* rows get written; the rest stop. Nothing below is unconditional.
@@ -85,17 +93,18 @@ its two *Record it* rows get written; the rest stop. Nothing below is unconditio
    done: the approach taken, anything replaced, anything deferred. Date it, citing the
    approval-record comment. The plan is an authoritative source, so an unapproved difference
    never reaches this step — it stopped at the table.
-2. **Each shipped issue** — if what landed differs from what its description said, patch the
-   description with an anchored edit and a dated note. Never a rewrite.
-3. **The milestone body** — if its "accepted when" no longer matches what was accepted, fix
-   it, **and only with an approval you can cite**: a milestone save has no patch operation, so
-   this is a full replace of hand-written text. Read the complete body first, prepend, re-send
-   the whole thing, and send `project` too (`linear-updates.md`). If you cannot reproduce the
-   existing body exactly, stop and ask.
+2. **Repo docs** the phase changed — a README, a runbook, anything a reader would now find
+   wrong.
+3. *(Issue and milestone bodies are Linear, not git — they are below.)*
 4. **The spec** — only where an **approved** change altered behaviour. An unapproved
    difference is a stop, not an edit.
-5. **The project description** — only if the goal or what-ships list is now wrong.
-6. **Remaining issues** — if this phase changed what a later issue must do, patch it now,
+
+### After the merge — Linear only, no git
+
+5. **Each shipped issue's description**, if what landed differs from what it said.
+6. **The milestone body**, if its "accepted when" moved.
+7. **The project description**, only if the goal or what-ships list is now wrong.
+8. **Remaining issues** — if this phase changed what a later issue must do, patch it now,
    while the reason is fresh. Do not leave it for the agent that picks it up.
 
 Say in the checkpoint report what you reconciled and what you left alone.

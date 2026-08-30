@@ -27,6 +27,15 @@ expected case, not as fact.
 **Never invent a label, state or template.** Use what exists, or state plainly that it does
 not.
 
+**Choosing an area label.** Pick the area that owns the code the issue changes, not the area
+that benefits from it. If two are equally true, pick the one the acceptance criteria are
+checked against. If none fits, say so in the confirm table rather than forcing the nearest —
+a wrong area label routes the work to the wrong people.
+
+**Choosing a type label.** `Bug` fixes broken behaviour, `Feature` adds behaviour that did not
+exist, `Improvement` changes behaviour that worked. New work is `Feature` unless the source
+says otherwise.
+
 ## Titles and sequencing
 
 | Project kind | Milestone name | Issue title |
@@ -45,12 +54,23 @@ issues first, detect the prefix convention already in use, and continue the sequ
 The saves depend on each other. Out of order, they fail partway and leave Linear half-built.
 
 ```
-1  project        a milestone save requires its project
+1  project        needs a NAME and at least one TEAM on create — a project save
+                  without a team is rejected. A milestone save then requires its project
 2  milestones     an issue is matched to a milestone BY NAME — it must already exist
 3  issues, one at a time, in sequence
                   a blocked issue needs its predecessor's identifier, both for the
                   blockedBy relation and for the "Blocked by ECH-41" line in its body
 ```
+
+**Naming the project.** Use the spec or plan's own title where it has one that reads as a
+product name. Otherwise take the outcome, not the activity — `Content Intelligence v2`, not
+`Implement content pipeline changes`. It is the handle `linear-implement` is invoked with and
+the first thing anyone sees, so **put it in the confirm table and let the user correct it.**
+
+**Look before you create.** List the team's existing projects first. If one already covers
+this work — a near-name match, or the same spec linked — **ask** whether to add to it rather
+than creating a second. Nothing downstream detects a duplicate project; the review compares
+Linear against your plan table, which will happily contain the duplicate.
 
 Never batch issue creates. You cannot write an Order line that names an identifier you do
 not have yet.
@@ -112,18 +132,39 @@ cycle and due date unset.
 
 ## Dependencies
 
-- Chain `blocks` / `blockedBy` sequentially **within** a phase.
+**The default is to chain within a phase.** Issues in one phase usually build on each other,
+and `linear-implement` executes "the next unblocked issue" off this graph — so getting it
+wrong changes what gets built when.
+
+- Chain `blocks` / `blockedBy` sequentially **within** a phase, unless you can say why two of
+  its issues are genuinely independent. If you can, leave them unlinked and say so in the
+  confirm table.
 - Across phases: link the first issue of Phase B as blocked by the last issue of Phase A
-  **only when the plan says the phases are sequential**. If they can run in parallel,
-  leave them unlinked.
-- Never chain issues that are genuinely independent. Numbering conveys reading order;
-  blocking conveys a real constraint.
+  **only when the plan says the phases are sequential**. If they can run in parallel, leave
+  them unlinked.
+
+Numbering conveys reading order; blocking conveys a real constraint. The confirm table shows
+the chain — it is the user's only chance to correct it.
 
 ## File links
 
 Use a GitHub blob URL — **only if the file is committed and pushed**. Verify with git; do
 not assume. Check `git check-ignore` too: a gitignored file can never be pushed, so it can
 never get a URL.
+
+**Pin the commit, not the branch.** A link to `blob/main/…` breaks when the file moves; a link
+to a feature branch dies when that branch is deleted after merge — and these issues are read
+weeks later, often by `linear-implement`, which stops on a source it cannot fetch.
+
+```
+git rev-parse HEAD                  # the SHA to pin
+git remote get-url origin           # may be SSH: git@github.com:owner/repo.git
+→ https://github.com/<owner>/<repo>/blob/<sha>/<path>
+```
+
+An SSH remote is not a URL. Transform `git@github.com:owner/repo.git` into
+`https://github.com/owner/repo` before building the link. For a non-GitHub host, build the
+equivalent permalink or treat the source as unreachable and stop.
 
 **Never link a path that does not exist.**
 
@@ -178,6 +219,10 @@ Descriptions get edited by hand. A full-description rewrite destroys that work.
   > The detail.
   ```
 
+  **Read today's date from the system before writing one.** These callouts are permanent and
+  are what a later reader trusts to order events; a remembered date is a guess. The date above
+  is an example, not a value to copy.
+
 - **A specific wrong statement** → anchored `replace` on that exact text.
 
 ### Milestones have no safe update — read before you write
@@ -226,7 +271,7 @@ a changelog long before it degrades into a long one.
 
 | Field | Behaviour |
 |---|---|
-| `labels` | **Replaces the entire set.** `get` the issue and read its current labels *before* writing any, then send the full intended set — otherwise existing labels are silently dropped. |
+| `labels` | **Replaces the entire set.** On an update that is not changing labels, **omit the field** — omitting leaves them untouched. When you are changing them, `get` the issue and read the current set first, then send the full intended set, or the others are silently dropped. |
 | `links`, `blocks`, `blockedBy`, `relatedTo` | Adding is safe — these do not replace the set. Removing needs the explicit remove operation, so a wrong dependency **can** be corrected; it just is not undone by omitting it. |
 | `patch` | Each anchor must match **exactly once**. One failing op aborts the whole save — nothing changes, which is safe but silent. |
 | `patch` anchors | Must match what Linear **stored**, not what you sent. Its parser rewrites markdown on save. **Always `get` the issue first and copy the anchor from the stored text.** |

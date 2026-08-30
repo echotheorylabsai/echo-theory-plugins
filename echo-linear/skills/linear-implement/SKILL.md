@@ -181,8 +181,13 @@ Batch 1  ECH-41, ECH-42        branch feat/content-v2-batch-1
 Batch 2  ECH-43, ECH-44        branch feat/content-v2-batch-2
 ```
 
-**Name who merges.** If PRs need human approval, say so in the plan — it changes the flow at
-the checkpoint.
+**Name who merges — and default to *not you*.** Ask in the plan. **If the answer is anything
+other than an explicit "you may merge it", a human merges.** A bare `yes` to the gate approves
+the plan, not merge authority.
+
+This is deliberate. Merging into a shared branch is irreversible and outward-facing, and the
+reader of this plan is agreeing to a build, not to an unattended merge. Detecting a PR tool
+and an unprotected branch is capability, not permission.
 
 **Say if the repo is busy.** If other worktrees or recent branches suggest concurrent agents
 or people, note it: the integration branch will move under this run, and phases may need to
@@ -201,6 +206,12 @@ post-flight, the PR, and the rule that an in-phase blocker is satisfied at `In R
 ### Pre-flight — before the first issue of every phase
 
 Earlier phases changed the codebase; this phase's issues were written before that happened.
+
+**Refresh the primary checkout first** — `git fetch origin && git checkout <integration> && git
+pull --ff-only`. Without it the pre-flight judges this phase's issues against a working tree
+that predates the previous phase's merge, which is exactly what it exists to catch. Any
+catch-up reconciliation carried over from step 0 happens here too, in the phase worktree once
+it is cut.
 
 Re-read this phase's issues from Linear and the sources they link, and check them against
 the code **as it now stands**: are the acceptance criteria still achievable and still
@@ -360,9 +371,10 @@ edited after the merge, because they cite the merged PR.
    **If you cannot merge at all** — no PR tooling, or a branch you may never merge — this is
    an unsatisfied external gate, not a failure. Say so, leave the issues `In Review`, and stop
    at this checkpoint. Do not close the project behind it (step 4).
-5. **Re-sync again before merging** — it can move between opening and merging. Once merged,
-   **confirm from the remote** that it landed on the intended integration branch. Under a
-   squash or rebase merge, confirm by content, not commit ancestry.
+5. **Merge — only if the step-1 plan said you may.** Re-sync first; it can move between
+   opening and merging. Then merge, and **confirm from the remote** that it landed on the
+   intended integration branch — by content under a squash or rebase, not commit ancestry.
+   If the plan did not grant merge authority, you are not here: item 4 is where you wait.
 6. Move every issue in the phase from `In Review` to **`Done`**, and update the Linear
    project record. This is the only place issues become Done.
 7. **Reconcile Linear.** Patch any issue whose description no longer describes what landed,
@@ -392,8 +404,16 @@ acceptance criteria; that required verification and independent reviews passed; 
 every external gate is satisfied or explicitly accepted as a separate follow-up.
 
 Then run the final relevant repository verification and **one final independent
-whole-project review**. Fix and re-review **significant** findings before claiming anything —
-"significant" means worth fixing before shipping, not the material-change gate.
+whole-project review**. "Significant" means worth fixing before shipping, not the
+material-change gate.
+
+**Fixing a close-time finding needs its own worktree.** Every phase worktree is gone by now.
+Cut one from the integration branch — `feat/<project-slug>-close` — fix there, re-verify,
+re-review, and ship it as a final PR under the same rules as a phase: the plan said who
+merges, and that still holds. Report it as a distinct PR, not folded into a phase.
+
+If the finding is a scope change rather than a defect, it is the material gate and probably a
+hand-back — not something to slip in at the close.
 
 Report: verified results, external assumptions, completed issues, remaining gates, gaps —
 and state plainly **either** that every document and Linear record describes what was built,

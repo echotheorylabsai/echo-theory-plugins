@@ -28,9 +28,10 @@ Steps 1, 3 and 5 are gates. **None may be skipped — not even on a single-issue
 
 ## 1. Readiness gate
 
-Collect the source of truth first: approved spec/plan files named in the conversation
-(else look under `docs/superpowers/specs/` and `docs/superpowers/plans/`), what was
-explicitly agreed in chat, and the relevant code.
+Collect the source of truth first: approved spec/plan files named in the conversation, what
+was explicitly agreed in chat, and the relevant code. If no file was named, look where this
+repo actually keeps design docs — check `docs/`, `design/`, `rfcs/` and the repo's own
+instructions before assuming a layout.
 
 Then reflect critically. Answer each, out loud, before going further:
 
@@ -50,6 +51,9 @@ Then reflect critically. Answer each, out loud, before going further:
 commit and push them before you file anything. Only file with a plain-text path when they
 explicitly say to go ahead without pushing — and say in the confirm table that the link is
 local-only. A file that does not exist is always a stop.
+
+**If the Linear MCP is not available, stop here.** Say the plugin needs it configured. Do
+not attempt any other route to Linear.
 
 **Any gap → STOP. Ask clarifying questions. Write nothing to Linear.**
 
@@ -85,8 +89,16 @@ project to use when the answer is that there isn't one yet.
 a project the user named adds milestones and issues to it — it never creates a second
 project.
 
-**Read Linear before you shape.** For any existing project, list its issues and milestones
-now, not at step 4 — the numbering and milestone names you print at step 3 depend on them.
+**Read Linear before you shape — the confirm table asserts these to the user.**
+
+1. **List the workspace's teams, states and labels.** This plugin runs in workspaces other
+   than the one it was written for. More than one team → ask which. No `Backlog` → use its
+   unstarted equivalent and say which. No type/area label scheme → say so and file with what
+   exists. **Never invent one.** Fallbacks in full: `references/conventions.md`.
+2. **List the team's existing projects.** If one already covers this work, ask whether to add
+   to it rather than create a second — nothing downstream detects a duplicate.
+3. **For an existing project, list its issues and milestones**, so the numbering and milestone
+   names you print at step 3 are real.
 
 **Minimum-issue discipline.** Think hard about the fewest issues that cover the work:
 
@@ -105,7 +117,7 @@ Show everything that will be written — including the wiring the user cannot se
 without hunting for it.
 
 ```
-WILL CREATE  on team Echotheorylabs · all issues state Backlog
+WILL CREATE  on team <the team you listed> · all issues state <its unstarted state>
   Project  Content Intelligence v2
   Phase A · Instrument
     [Phase A.1] Record the baseline   Feature/platform
@@ -150,8 +162,11 @@ Record the identifier and URL of every artifact you touch — step 5 needs that 
 those copies.
 
 **Keep all three on disk, not only in context**: the confirmed plan table, the verbatim
-pre-write copies, and the artifact list. Write them to a scratch file before step 4 begins. A
-context loss between the gate and the review otherwise leaves the mandatory reviewer inputs
+pre-write copies, and the artifact list. Write them to `.linear-sync/<date>-<project-slug>.md`
+in the repo root before step 4 begins, and confirm `.linear-sync/` is gitignored — add the
+line if not. Delete the file once step 5 reports.
+
+A context loss between the gate and the review otherwise leaves the mandatory reviewer inputs
 unreconstructable, and this skill has no resume path.
 
 ## 5. Adversarial review
