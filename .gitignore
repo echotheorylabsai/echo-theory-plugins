@@ -1,8 +1,8 @@
-# Internal development docs
-docs/superpowers/
-
 # Local Claude Code settings (may contain machine-specific paths)
 .claude/settings.local.json
+
+# linear-implement execution ledgers (local working state)
+.linear-implement/
 
 # macOS
 .DS_Store

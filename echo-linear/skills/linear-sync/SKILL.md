@@ -1,6 +1,6 @@
 ---
 name: linear-sync
-description: Use when work agreed in this conversation needs to reach Linear as projects, milestones or issues, or when existing Linear artifacts need updating from newly approved decisions. Triggers include "put this in Linear", "create the Linear issues", "update the Linear project", or finishing a spec, PRD, design doc or implementation plan that someone now has to build.
+description: Use when work agreed in this conversation needs to reach Linear as projects, milestones or issues, or when existing Linear artifacts need updating from newly approved decisions. Triggers include "put this in Linear", "create the Linear issues", "update the Linear project", or finishing a spec, PRD, design doc or implementation plan that someone now has to file. Do NOT use for building the work those issues describe — that is linear-implement.
 ---
 
 # linear-sync
@@ -28,18 +28,32 @@ Steps 1, 3 and 5 are gates. **None may be skipped — not even on a single-issue
 
 ## 1. Readiness gate
 
-Collect the source of truth first: approved spec/plan files named in the conversation
-(else look under `docs/superpowers/specs/` and `docs/superpowers/plans/`), what was
-explicitly agreed in chat, and the relevant code.
+Collect the source of truth first: approved spec/plan files named in the conversation, what
+was explicitly agreed in chat, and the relevant code. If no file was named, look where this
+repo actually keeps design docs — check `docs/`, `design/`, `rfcs/` and the repo's own
+instructions before assuming a layout.
 
 Then reflect critically. Answer each, out loud, before going further:
 
-- Is the scope **agreed**, or still being debated? A proposal is not an approval.
+- Is the scope **agreed**, or still being debated? A proposal is not an approval. Agreed
+  means the user said build this, or approved a document that says so. A plan file you
+  found is not an approval on its own — ask.
 - Do I know the goal, who it is for, and how we would know it worked?
 - Can I write acceptance criteria that are **checkable**, not vague?
-- Do the components, surfaces or products I would name **actually exist** in the repo? Verify.
+- Do the components this work **depends on** actually exist in the repo? Verify. A
+  component the work **creates** is expected to be absent — that is not a gap.
 - Create or update — and if update, exactly which project or issue?
-- If linking files: do they exist? Are they committed and pushed?
+- If linking files: do they exist, and can **someone else** reach them? A pushed file gets a
+  real URL. An unpushed, uncommitted or gitignored file is reachable only on this machine —
+  a teammate opening the issue, or an agent in a fresh checkout, gets a dead path.
+
+**Unreachable sources are a stop.** Say which files are not pushed and ask the user to
+commit and push them before you file anything. Only file with a plain-text path when they
+explicitly say to go ahead without pushing — and say in the confirm table that the link is
+local-only. A file that does not exist is always a stop.
+
+**If the Linear MCP is not available, stop here.** Say the plugin needs it configured. Do
+not attempt any other route to Linear.
 
 **Any gap → STOP. Ask clarifying questions. Write nothing to Linear.**
 
@@ -50,11 +64,41 @@ guess is worse than no issue: it looks authoritative and it is already live.
 
 Pick one tier and say which, with a one-line reason.
 
-| Tier | Input | Creates |
-|---|---|---|
-| 1 | A chat agreement, or one change | Issues only, on an existing project. If none is named, **ask** — never guess, never create a project to dodge the question. |
-| 2 | A spec or PRD, no phased plan | New project + flat issues |
-| 3 | A spec + a phased implementation plan | New project + milestones from phases + issues |
+**Tier is decided by the shape of the work, not by whether a file exists.** An agreement
+reached in chat counts as its source; a written spec is better, not required.
+
+**But a chat agreement must land somewhere reachable before you file.** The session ends; the
+issues outlive it, and `linear-implement` stops on a source it cannot read. So when there is
+no spec or plan file, write what was agreed into the **project description** — goal, scope,
+constraints, what is out — and say in the confirm table that the project description *is* the
+approved source. Then every issue's Context line points at the project, not at nothing.
+
+| Tier | The work is | Creates | Titles |
+|---|---|---|---|
+| 1 | Additions to a project that **already exists** — whatever the source | Issues on that project, plus a milestone only if the addition is a genuinely new phase | continue the project's existing convention |
+| 2 | A new body of work with **no phases** | New project + flat issues | simple — `1. Title` |
+| 3 | A new body of work **organised into phases** | New project + milestones from phases + issues | complex — `[Phase A.1] Title` |
+
+Tier 1 is about the *target*; tiers 2 and 3 about the *shape*. A phased plan going into a
+project that already exists is tier 1 with milestones added — never a second project.
+
+**If no project exists and none is named, tiers 2 and 3 create one.** Do not ask which
+project to use when the answer is that there isn't one yet.
+
+**A named existing project overrides the tier's "new project".** Tier 3 material going into
+a project the user named adds milestones and issues to it — it never creates a second
+project.
+
+**Read Linear before you shape — the confirm table asserts these to the user.**
+
+1. **List the workspace's teams, states and labels.** This plugin runs in workspaces other
+   than the one it was written for. More than one team → ask which. No `Backlog` → use its
+   unstarted equivalent and say which. No type/area label scheme → say so and file with what
+   exists. **Never invent one.** Fallbacks in full: `references/conventions.md`.
+2. **List the team's existing projects.** If one already covers this work, ask whether to add
+   to it rather than create a second — nothing downstream detects a duplicate.
+3. **For an existing project, list its issues and milestones**, so the numbering and milestone
+   names you print at step 3 are real.
 
 **Minimum-issue discipline.** Think hard about the fewest issues that cover the work:
 
@@ -69,14 +113,20 @@ Pick one tier and say which, with a one-line reason.
 
 Print the plan and wait. Nothing is written until the user says yes.
 
+Show everything that will be written — including the wiring the user cannot see later
+without hunting for it.
+
 ```
-WILL CREATE
+WILL CREATE  on team <the team you listed> · all issues state <its unstarted state>
   Project  Content Intelligence v2
   Phase A · Instrument
     [Phase A.1] Record the baseline   Feature/platform
-    [Phase A.2] Seal Day 0            Feature/platform
+    [Phase A.2] Seal Day 0            Feature/platform   ← blocked by A.1
   Phase B · Report
-    [Phase B.1] Change log            Feature/echo-hq
+    [Phase B.1] Change log            Feature/echo-hq    ← blocked by A.2
+
+  Sources   Spec + plan, both pushed — real links
+  Dates     none set
 
 WILL UPDATE
   ECH-44   prepend dated callout
@@ -84,13 +134,40 @@ WILL UPDATE
 Proceed?
 ```
 
+**Everything step 5 audits must appear here**, because this table is the only record of what
+was approved and the only thing a partial-failure recovery has to work from:
+
+- team, project and milestone each issue lands on
+- the exact labels, and the state
+- blocking relations
+- target dates, or `none set`
+- whether each source link is a real URL or local-only
+
+Anything absent here cannot be checked, and cannot be recovered later.
+
 If they amend, re-print and wait again.
 
 ## 4. Write
 
 Follow `references/formats.md` for what goes in each description, and
 `references/conventions.md` for titles, labels, **milestones**, links, relations and the
-**safe-update rules**. Record the identifier and URL of every artifact you touch — step 5 needs the list.
+**safe-update rules** — including the write order, which is not optional.
+
+**Before you overwrite anything, keep a verbatim copy of it.** Every existing description
+and milestone body you are about to change, saved as you read it. Once the save lands the
+old text is unrecoverable, and step 5's "nothing was destroyed" check has nothing to compare
+against.
+
+Record the identifier and URL of every artifact you touch — step 5 needs that list and
+those copies.
+
+**Keep all three on disk, not only in context**: the confirmed plan table, the verbatim
+pre-write copies, and the artifact list. Write them to `.linear-sync/<date>-<project-slug>.md`
+in the repo root before step 4 begins, and confirm `.linear-sync/` is gitignored — add the
+line if not. Delete the file once step 5 reports.
+
+A context loss between the gate and the review otherwise leaves the mandatory reviewer inputs
+unreconstructable, and this skill has no resume path.
 
 ## 5. Adversarial review
 
