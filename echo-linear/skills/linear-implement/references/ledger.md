@@ -6,9 +6,13 @@ A multi-issue run outlives a context window. The ledger is what survives it.
 
 `.linear-implement/<slug>.md` in the **primary checkout** of the repo being worked on.
 
-The **slug is the Linear project identifier**, not its name — stable, unique, and the same
-every session. Fall back to the name lowercased with non-alphanumerics collapsed to `-` only
-if the project has no identifier, and record which you used in the header.
+The **slug is whatever Linear gives you that is stable and unique** for this project — its
+UUID, or a URL slug. Not its name, which can be renamed underneath you. Different Linear
+clients expose different shapes; take the most stable one on offer and **record in the header
+which you used**, so a later session looking for the file knows what to look for.
+
+Only if there is genuinely no stable identifier, fall back to the name lowercased with
+non-alphanumerics collapsed to `-`.
 
 - **Not in a worktree** — per-phase worktrees are removed at the end of each milestone and
   would take the ledger with them.
@@ -45,7 +49,7 @@ reason evidence goes into Linear comments and not only here.
 ```markdown
 # Content Intelligence v2 — execution ledger
 
-Project      <Linear project identifier>
+Project      <the stable identifier you used — say which kind: UUID, URL slug, name>
 Baseline     docs/superpowers/plans/2026-08-20-content-v2-plan.md @ abc1234
 Integration  main
 Started      2026-08-30

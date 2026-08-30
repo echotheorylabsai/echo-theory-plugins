@@ -81,6 +81,12 @@ recoverable.
 "Turn this implementation plan into a Linear project with milestones"
 ```
 
+**Before you start**: **commit and push your spec or plan.** Issues link to their sources, and
+a link only your machine can open is useless to a teammate — and unreadable to
+`linear-implement` later. An unpushed source stops the run and asks you to push. If the
+agreement lives only in the conversation, it writes it into the project description instead, so
+there is still something reachable to point at.
+
 **What happens next**: it reflects on whether the scope is actually agreed, picks a shape,
 then prints a `WILL CREATE` table and waits. Nothing reaches Linear before you say yes.
 

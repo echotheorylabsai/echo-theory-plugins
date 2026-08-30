@@ -162,12 +162,27 @@ Record the identifier and URL of every artifact you touch — step 5 needs that 
 those copies.
 
 **Keep all three on disk, not only in context**: the confirmed plan table, the verbatim
-pre-write copies, and the artifact list. Write them to `.linear-sync/<date>-<project-slug>.md`
-in the repo root before step 4 begins, and confirm `.linear-sync/` is gitignored — add the
-line if not. Delete the file once step 5 reports.
+pre-write copies, and the artifact list. A context loss between the gate and the review
+otherwise leaves the mandatory reviewer inputs unreconstructable, and this skill has no resume
+path.
 
-A context loss between the gate and the review otherwise leaves the mandatory reviewer inputs
-unreconstructable, and this skill has no resume path.
+**Write them outside the repository** — the system temp directory, or any scratch location the
+harness gives you, in a file named for the project. Say where in your report. Never inside the
+working tree.
+
+If nothing outside the repo is writable, say so and carry on holding them in context — this is
+a safeguard against context loss, not a gate. Do not fall back to writing inside the repo.
+
+**If a run is interrupted between writing and reviewing**, there is no resume: this skill is
+one pass. Re-invoking it starts over, and step 2's "read Linear before you shape" will surface
+whatever the interrupted run created. Say plainly what already exists, and let the user choose
+between completing it by hand and letting the fresh run reconcile against it. **Never assume a
+half-created project is yours to finish silently.**
+
+The file exists for one run and is deleted when step 5 reports. Putting it in the repo would
+mean a `.gitignore` line, and that line dirties the working tree: `linear-implement`'s step 0
+stops on **any** uncommitted change, so a scratch file from this skill would block the very
+handoff this skill ends by offering. Keep it out of the repo and the problem does not exist.
 
 ## 5. Adversarial review
 

@@ -73,6 +73,10 @@ assumes the column is always populated.
 
 State facts and options. **Never announce a decision, a new plan, or a changed criterion.**
 
+**When a finding spans two issues** — the cause in one, the harm in another — post the full
+comment on the issue where the **harm** is, since that is where someone judging severity needs
+it, and a one-line pointer on the other. Say in both which is which.
+
 ### Approval record
 
 ```markdown

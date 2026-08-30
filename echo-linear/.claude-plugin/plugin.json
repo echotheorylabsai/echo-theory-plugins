@@ -1,7 +1,7 @@
 {
   "name": "echo-linear",
-  "version": "1.1.0",
-  "description": "Turn approved specs, PRDs and implementation plans into Linear projects, milestones and issues written in product language — then deliver them, issue by issue, test-first, with an adversarial review before anything is reported as done.",
+  "version": "1.2.0",
+  "description": "Turn approved specs, PRDs and implementation plans into Linear projects, milestones and issues written in product language \u2014 then deliver them, issue by issue, test-first, with an adversarial review before anything is reported as done.",
   "author": {
     "name": "Echo Theory Labs",
     "email": "team@echotheory.ai"
