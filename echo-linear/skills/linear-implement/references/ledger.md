@@ -124,10 +124,17 @@ After any interruption — a new session, a context reset, a stopped run:
 6. **Re-print the delivery plan for what remains and wait for a yes.** The gate belongs to
    the session, not to the project — the earlier approval was given to a session that is
    gone.
-7. Resume at the first issue that is **neither Done nor already finished**. An issue sitting
-   `In Review` with an evidence comment and its commit on the phase branch is finished —
-   **do not re-implement it.** Verify the commit is there, and move on. Only an issue with no
-   evidence comment and no commit is genuinely unstarted.
+7. **If every issue in a phase is `In Review`, the phase is built, not unstarted.** Resume
+   inside checkpoint step 3, not step 2: find whether its PR exists, and re-enter at the item
+   that matches — no PR yet → item 1; PR open → item 4; merged but issues not `Done` → item
+   6. Never re-implement a built phase.
+
+   Otherwise resume at the first issue that is **neither Done nor already finished**. An issue
+   sitting `In Review` with an evidence comment and its commit on the phase branch is
+   finished — **do not re-implement it.** Verify the commit is there and move on. An issue
+   `In Progress` with a commit but no evidence comment is *part-built*: keep the commit,
+   re-read the issue, and continue from where the criteria are unmet rather than starting
+   over. Only an issue with no evidence comment and no commit is genuinely unstarted.
 8. If the phase branch and worktree still exist, reuse them. Cut a new worktree only when
    starting a phase that has none.
 9. Then continue from step 2. **Re-run the phase's pre-flight if the phase has not started or

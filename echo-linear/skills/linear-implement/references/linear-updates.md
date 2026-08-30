@@ -20,7 +20,7 @@ note there is no `Blocked` state here. Full workspace notes:
 | The phase PR merged and was confirmed from the remote | `Done` — set for every issue in that phase at the checkpoint |
 | Unstarted | `Backlog` / `Todo` — leave as found |
 | Found `Canceled` or `Duplicate` at step 0 | Skip it. Do not resurrect it; say so in the delivery plan |
-| Found already `In Progress` or `Done` at step 0 | Resume if the ledger — read or rebuilt from Linear per `ledger.md` § Resuming — accounts for it. Stop and ask only when Linear shows work no record can explain: an issue `In Progress` with no evidence comment and no branch means someone else is in there |
+| Found already `In Progress`, `In Review` or `Done` at step 0 | Resume if the ledger — read or rebuilt from Linear per `ledger.md` § Resuming — accounts for it. Stop and ask only when Linear shows work no record can explain: an issue `In Progress` with no evidence comment and no branch means someone else is in there |
 
 **A blocked issue is never Done.** State is a claim about reality, not a courtesy to the
 run's tidiness. Never move an issue to Done to make a report look finished.
@@ -82,7 +82,11 @@ sealing forward.
 **Asked** — see the discrepancy comment above; three options given.
 **Answer** — option (a), backfill first.
 **Changes** — plan §Phase A.2 gains a backfill step; this issue's criterion 2 is patched.
+**Replaces** — plan §Phase A.2 previously read "seal each row in place as it is read".
 ```
+
+**Quote the superseded text** in `Replaces`. Once the doc is updated, that wording exists
+nowhere else, and the close pass needs it to audit what actually changed.
 
 **Name who approved**, in the first line: the user, or a named human reviewer on the PR. A
 reviewer subagent cannot approve anything — it reports. "Approved" with no approver is not a

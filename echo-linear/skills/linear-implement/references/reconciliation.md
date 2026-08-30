@@ -52,6 +52,10 @@ issue, or nothing.
 
 Previous phases changed the codebase. This phase's issues were written before that happened.
 
+**On the very first phase there are none**, and step 0 read everything minutes ago. Say so and
+move on — do not re-fetch the project to satisfy the form. From the second phase onward it is
+not optional.
+
 Re-read, fresh: this phase's issues from Linear — **including their comments**, which is where
 approval records and discrepancies live — and the sources they link. Citing an approval you
 have not fetched is not citing it. Then check against the code as it now stands:
@@ -117,6 +121,12 @@ The code is already live; the honest record of that is the point, not a tidy doc
 
 Before declaring the project complete, read the spec, the plan, the project, every milestone
 and every issue — **with its comments** — against the code that exists.
+
+**And against the baseline the ledger pinned.** Comparing docs to code only proves they agree
+now; a deviation that post-flight already normalised leaves no difference to find. Diff the
+plan and spec against their state at the pinned baseline commit, and for every change, name
+the approval record that licensed it. A change with no record is drift that reconciliation
+wrote in — report it.
 
 The closing report must state, in plain words, **either**:
 

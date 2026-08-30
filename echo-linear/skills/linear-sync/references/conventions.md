@@ -218,7 +218,9 @@ a changelog long before it degrades into a long one.
 - The description stays a description. The comment thread carries the history.
 - At a third callout on a milestone, fold the oldest into a **comment on that milestone** and
   say you did. Milestone comments exist — they render as description comments — so history
-  stays with the artifact it belongs to.
+  stays with the artifact it belongs to. **A comment needs the milestone's UUID**, not its
+  name: list the project's milestones to resolve it first. (A milestone *save* accepts the
+  name; a comment does not.)
 
 ### Traps
 

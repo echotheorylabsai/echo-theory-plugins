@@ -23,9 +23,8 @@ file; `../../linear-sync/…` from inside `references/`.
 2  PHASE       PRE-FLIGHT: are this phase's issues and docs still true? → then
                per issue: re-read → test-first → implement → independent
                review → commit → In Review
-3  CHECKPOINT  phase ships: re-sync → PR → re-sync → merge → issues Done →
-               POST-FLIGHT: make the docs and Linear match what shipped →
-               clean up → report → wait
+3  CHECKPOINT  reconcile docs into the phase branch → re-sync → PR → merge →
+               issues Done → reconcile Linear → clean up → report → wait
 4  CLOSE       full reconciliation, whole-project review, honest report
 ```
 
@@ -86,10 +85,14 @@ keying off the file would silently start a fresh run over live work.
 Follow `references/ledger.md` § Resuming — read the ledger, or rebuild it from Linear when
 there is none. A resume still passes through the step-1 gate.
 
-**On a resume, check the last completed phase's post-flight ran.** If a phase is `Done` but
-the plan, its issues or its milestone still describe something else, the previous session
-died between the merge and its reconciliation. Run that post-flight now, before touching the
-next phase — its approval records are what this phase's pre-flight has to read.
+**On a resume, check the last completed phase's reconciliation ran.** If a phase is `Done`
+but the plan, its issues or its milestone still describe something else, the previous session
+died between the merge and its reconciliation.
+
+**Do not fix it here** — step 1 forbids writing anything before the gate. Say so in the
+delivery plan as work to be done first, and carry it out immediately after the yes, before
+the next phase's pre-flight. Its approval records are what that pre-flight has to read. Doc
+edits ride in the next phase's PR; Linear edits happen straight away.
 
 Then follow every link and read the **approved sources themselves**, not the issue's
 summary of them. Identify the authoritative baseline — prefer a committed, pushed, pinned
@@ -257,6 +260,13 @@ Move on only when the current issue is complete and its real dependencies permit
 `Done` only when the phase PR has merged and been confirmed. Blocked or stopped stays
 `In Progress` with a comment. **A blocked issue is never Done.**
 
+**Descoping an issue.** If the user answers a stop with "skip it and carry on", that is a
+scope change: take it through the material gate, post the approval record, and hand back to
+`linear-sync` if the issue must be re-scoped rather than dropped. Then set the skipped issue
+to the workspace's unstarted state with a comment saying it was descoped and why, revert or
+drop its `WIP (unreviewed):` commits, and treat its blocker as satisfied for the issues after
+it. It is **not** `Done`, and checkpoint item 6 must not sweep it there.
+
 **Grind limit.** A *verification cycle* is one implement-then-verify attempt after the
 first red test. Three failed cycles on one issue **stops the run**: commit the work in
 progress so the evidence survives, **prefixed `WIP (unreviewed):`**, record what failed and
@@ -309,25 +319,38 @@ A specification change that alters requirements or behaviour is **always** mater
 
 ## 3. Milestone checkpoint — ship the phase
 
-Every issue in the phase is committed and `In Review`. Now the phase lands:
+Every issue in the phase is committed and `In Review`. Now the phase lands.
 
-1. **Re-sync first.** Fetch; if the integration branch moved while you worked, integrate it
-   into the phase branch and **re-run verification** — green from before the integration
-   proves nothing. A conflict is a stop. See `references/execution-method.md`.
-2. **Open the PR** for the phase branch, listing each issue and its evidence.
-3. **If a human must approve or merge it, say so, report, and wait** — hand back with the PR
+**Reconciliation happens on both sides of the merge, and the split is not arbitrary.** Files
+tracked by git — the plan, the spec, repo docs — must be edited **in the worktree and
+committed to the phase branch, before the PR opens**, so they ship with the code they
+describe. There is no legal place to commit them afterwards: the branch has merged, the
+primary checkout must stay clean, and the integration branch is barred. Linear records are
+edited after the merge, because they cite the merged PR.
+
+1. **Reconcile the docs, in the worktree.** Update the plan's section for this phase, and the
+   spec where an **approved** change altered behaviour. Commit to the phase branch. An
+   unapproved difference is the material gate, not an edit. `references/reconciliation.md`.
+2. **Re-sync.** Fetch; if the integration branch moved while you worked, integrate it into the
+   phase branch and **re-run verification** — green from before the integration proves
+   nothing. A conflict is a stop. See `references/execution-method.md`.
+3. **Open the PR** for the phase branch, listing each issue and its evidence. It carries the
+   code *and* the doc updates.
+4. **If a human must approve or merge it, say so, report, and wait** — hand back with the PR
    link and "tell me when it has merged, or what to change." Do not start the next phase;
    its worktree would be cut from a branch that does not contain this one.
 
-   **When they say it merged:** skip item 4 entirely — the merge has happened, so there is
-   nothing to re-sync before it. **Confirm from the remote** that it landed on the intended
-   integration branch (by content, under a squash or rebase), then continue at item 5. Do not
-   re-run pre-flight and do not restart the phase.
+   **When they say it merged:** skip item 5 — the merge has happened, so there is nothing to
+   re-sync before it. **Confirm from the remote** that it landed (by content, under a squash
+   or rebase). Then **re-run verification against the merged integration branch** before
+   continuing at item 6: it may have moved for days while the PR sat, and a clean merge can
+   still be semantically broken. Do not re-run pre-flight and do not restart the phase.
 
    **When they bring back review feedback:** apply it on the phase branch, re-verify, re-run
-   the independent review for each issue the change touches, push, and return to **item 3** —
-   the PR already exists; never open a second one. Name the issue in each commit; if the
-   change spans two issues, split the commits.
+   the independent review for each issue the change touches, re-reconcile the docs if the
+   change moved them, push, and return to **item 4** — the PR already exists; never open a
+   second one. Name the issue in each commit; if the change spans two issues, split the
+   commits and post an approval record on **each**.
 
    Feedback that changes behaviour, acceptance criteria or scope is a **material change** —
    take it through that gate first, even though a human asked for it. In this post-PR state
@@ -337,19 +360,18 @@ Every issue in the phase is committed and `In Review`. Now the phase lands:
    **If you cannot merge at all** — no PR tooling, or a branch you may never merge — this is
    an unsatisfied external gate, not a failure. Say so, leave the issues `In Review`, and stop
    at this checkpoint. Do not close the project behind it (step 4).
-4. **Re-sync again before merging** — it can move between opening and merging. Once merged,
+5. **Re-sync again before merging** — it can move between opening and merging. Once merged,
    **confirm from the remote** that it landed on the intended integration branch. Under a
    squash or rebase merge, confirm by content, not commit ancestry.
-5. Move every issue in the phase from `In Review` to **`Done`**, and update the Linear
+6. Move every issue in the phase from `In Review` to **`Done`**, and update the Linear
    project record. This is the only place issues become Done.
-6. **Post-flight — make the record match what shipped.** Update the plan's section for this
-   phase, patch any issue whose description no longer describes what landed, fix the
-   milestone body if its "accepted when" moved, and patch **remaining** issues this phase
-   changed the premise of. Only for changes that were approved — an unapproved difference is
-   the material gate, not an edit. `references/reconciliation.md`.
-7. **Clean up** the worktree and branch per `references/execution-method.md`.
-8. Report: issues shipped with their evidence, **what you reconciled**, findings, risks, what
-   comes next.
+7. **Reconcile Linear.** Patch any issue whose description no longer describes what landed,
+   fix the milestone body if its "accepted when" moved, and patch **remaining** issues this
+   phase changed the premise of. No git is involved, so this belongs after the merge.
+   `references/reconciliation.md`.
+8. **Clean up** the worktree and branch per `references/execution-method.md`.
+9. Report: issues shipped with their evidence, **what you reconciled on each side**, findings,
+   risks, what comes next.
 
 **Wait for a yes before starting the next milestone.**
 

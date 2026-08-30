@@ -63,6 +63,12 @@ Pick one tier and say which, with a one-line reason.
 **Tier is decided by the shape of the work, not by whether a file exists.** An agreement
 reached in chat counts as its source; a written spec is better, not required.
 
+**But a chat agreement must land somewhere reachable before you file.** The session ends; the
+issues outlive it, and `linear-implement` stops on a source it cannot read. So when there is
+no spec or plan file, write what was agreed into the **project description** — goal, scope,
+constraints, what is out — and say in the confirm table that the project description *is* the
+approved source. Then every issue's Context line points at the project, not at nothing.
+
 | Tier | The work is | Creates | Titles |
 |---|---|---|---|
 | 1 | Additions to a project that **already exists** — whatever the source | Issues on that project, plus a milestone only if the addition is a genuinely new phase | continue the project's existing convention |
@@ -99,7 +105,7 @@ Show everything that will be written — including the wiring the user cannot se
 without hunting for it.
 
 ```
-WILL CREATE
+WILL CREATE  on team Echotheorylabs · all issues state Backlog
   Project  Content Intelligence v2
   Phase A · Instrument
     [Phase A.1] Record the baseline   Feature/platform
@@ -142,6 +148,11 @@ against.
 
 Record the identifier and URL of every artifact you touch — step 5 needs that list and
 those copies.
+
+**Keep all three on disk, not only in context**: the confirmed plan table, the verbatim
+pre-write copies, and the artifact list. Write them to a scratch file before step 4 begins. A
+context loss between the gate and the review otherwise leaves the mandatory reviewer inputs
+unreconstructable, and this skill has no resume path.
 
 ## 5. Adversarial review
 

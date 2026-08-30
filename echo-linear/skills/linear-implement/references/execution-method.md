@@ -249,9 +249,22 @@ Then:
    `.pytest_cache`, coverage output), delete those files and retry. **Never
    `--force`** — it discards uncommitted work irreversibly, and there is no way to tell from
    outside whether that work mattered. If it still refuses, retain the worktree and report.
-4. Delete **only that exact local branch**, non-force: `git branch -d <branch>`. A squash or
-   rebase merge will make this refuse — retain the branch and report why. **Never
-   force-delete.**
+4. Delete **only that exact local branch**, non-force: `git branch -d <branch>`.
+
+   **`-d` is a weaker safety net than it looks.** After a squash merge it succeeds — verified,
+   exit 0 — printing only `warning: deleting branch 'x' that has been merged to
+   'refs/remotes/origin/x', but not yet merged to HEAD`. It is satisfied by the
+   *remote-tracking ref*, not by the integration branch actually containing the work. So it
+   will cheerfully delete a branch whose commits never landed.
+
+   **Therefore: confirm the merge by content first (item 0 above), and treat that as the
+   safety check — not `-d`'s exit code.** Read the warning; if it names a remote ref rather
+   than your integration branch, you have only proved the branch reached the remote.
+
+   If `-d` does refuse — the remote branch was deleted and pruned, so git can no longer see it
+   as merged — retain the branch and report why. **Never force-delete.** `git branch
+   --contains` will correctly call a squashed branch unmerged; that is expected and is not a
+   reason to force anything.
 5. Prune stale remote-tracking references only if authorized. **Never** delete a remote
    branch, tag, release or deployment resource unless explicitly asked.
 
