@@ -78,11 +78,13 @@ Anything a future edit is likely to touch lives in a reference file.
 ```
 0  ADOPT       read the whole project + approved sources → state the model
 1  GATE        show the delivery plan → wait for an explicit yes
-2  ISSUE       next unblocked issue only, in this phase's worktree: re-read →
-               test-first → implement → independent review → commit → In Review
-3  CHECKPOINT  phase ships: re-sync → PR → re-sync → merge → all its issues Done
-               → clean up → report → wait
-4  CLOSE       whole-project review, final verification, honest report
+2  PHASE       PRE-FLIGHT: are this phase's issues and docs still true? → then
+               per issue: re-read → test-first → implement → independent
+               review → commit → In Review
+3  CHECKPOINT  phase ships: re-sync → PR → re-sync → merge → issues Done →
+               POST-FLIGHT: make the docs match what shipped → clean up →
+               report → wait
+4  CLOSE       full reconciliation, whole-project review, honest report
 ```
 
 Step 1 and step 3 are gates. So is the **material-change decision** inside step 2. None
@@ -90,9 +92,12 @@ may be skipped, including on a single-issue project.
 
 ### 6.1 Step 0 — adopt
 
-**Check for a resume first.** An existing ledger under `.linear-implement/` means this is a
-resumed run: follow the ledger's resume protocol, then rejoin at step 1. A resume does not
-skip the gate — the gate belongs to the session, not to the project.
+**Check for a resume — from Linear, not from disk.** Any issue already `In Progress`,
+`In Review` or `Done` means this is a resumed run, whether or not a ledger exists locally: a
+different machine has none, and keying off the file would start a fresh run over live work.
+Read the ledger or rebuild it from Linear, then rejoin at step 1 — a resume does not skip the
+gate, which belongs to the session, not the project. Also check whether the last completed
+phase's post-flight actually ran; if it did not, run it before touching the next phase.
 
 Identify the project from the invocation (ID, URL or name). An issue key is resolved to its
 parent project and confirmed. If none was named, ask. Never guess and never pick the most
@@ -103,10 +108,14 @@ comments, relations, dependencies and states — then follow every link and read
 **approved sources themselves**, not their summaries in the issue.
 
 Identify the authoritative baseline, preferring a committed, pushed, pinned link. Confirm
-each source is **readable and stable** — a pushed URL is best, a repo-relative path is
-acceptable when the file is present and unchanged. This must not be stricter than
-`linear-sync`, which links unpushed repo paths by design; requiring sources to be committed
+each source is **readable**. Where you cannot tell whether it is current — an uncommitted or
+gitignored source has nothing to pin against — say so in the delivery plan rather than
+asserting it. This must not be stricter than `linear-sync`; requiring sources to be committed
 on the integration branch would dead-end the handoff between the two skills.
+
+**List the workspace's states.** The per-milestone model needs a state meaning *finished but
+not merged*. Find this workspace's equivalent of `In Review` and name it in the plan; if
+there is none, ask — never invent one, never fall back to `Done` before a merge.
 
 **Determine the integration branch** — the repo's default unless its instructions name
 another. State which. If there is no clear default, ask.
@@ -130,7 +139,8 @@ sources govern. Where they conflict, that is a material change.
 - an issue has no checkable acceptance criteria
 - a component the work **depends on** does not exist in the repo — a component the work
   **creates** is expected to be absent, and is not a stop
-- the primary checkout has uncommitted changes other than the ledger
+- the primary checkout has **any** uncommitted change; the untracked ledger directory is the
+  one exception, and its `.gitignore` line is edited and committed in a worktree, never here
 - no Linear project exists for this work — that is `linear-sync`'s job
 
 ### 6.2 Step 1 — start gate
@@ -151,6 +161,7 @@ Phase B · Report
 
 Checkpoints  after Phase A · after Phase B
 Gates        PR review — say who merges
+Also in PR   one .gitignore line for .linear-implement/  (Phase A)
 Risks        ECH-42 touches the production data export
 
 Start implementation?
@@ -165,8 +176,10 @@ boundaries **of size, not of phase** — every second issue, or every issue for 
 That is a run-length decision confirmed in chat, not an invented roadmap, and nothing about
 it is written to Linear; it therefore does not collide with "never invent phases".
 
-The plan also **names who merges.** If PRs need human approval, the flow in step 2.8 routes
-through `In Review` rather than merging.
+The plan also **names who merges.** If PRs need human approval, the checkpoint hands over the
+PR link and waits rather than merging, with a confirmation-only re-entry when the user says
+it landed. A branch that can never be merged is an unsatisfied external gate, not a failure:
+issues stay `In Review` and the project does not close behind it.
 
 ### 6.3 Step 2 — execute, one issue at a time
 
@@ -174,10 +187,11 @@ Work only on the next unblocked issue. Before setting it In Progress, re-read it
 Linear record and every linked source — either may have changed since step 0.
 
 1. **Restate** the smallest shippable outcome and its acceptance criteria in the ledger.
-2. **Isolate** — **update the local integration branch from the remote first**, then cut a
-   worktree and branch from it. Without the fetch, every issue after the first branches off
-   code that does not contain the previous merge. One issue, one worktree, one branch, one
-   PR. Never implement on the integration branch.
+2. **Isolate** — work in this phase's worktree. At the phase's first issue, fetch and update
+   the local integration branch, then cut the worktree from it; later issues reuse it. One
+   milestone, one worktree, one branch, one PR — one commit per issue. Without the fetch, a
+   phase branches off code that does not contain the previous phase's merge. Never implement
+   on the integration branch.
 3. **Inspect** the owning code, tests, repo instructions and established patterns. Keep
    the design minimal. No speculative abstraction, no unrelated cleanup.
 4. **Set state** `In Progress`.
@@ -188,10 +202,17 @@ Linear record and every linked source — either may have changed since step 0.
    tests are evidence about code, never proof of deployment or production state.
 7. **Review independently** — read-only, clean context, given the diff, the tests, the
    approved acceptance criteria and the evidence, never the writer's reasoning. Fix
-   material findings, re-verify, re-review after material changes.
+   *significant* findings, re-verify, re-review after a significant change. "Significant"
+   is deliberately not "material" — the latter names the gate that halts the run.
 8. **Land it** — commit to the phase branch, with the issue key in the message.
 9. **Record** — **one** evidence comment on the issue, then set it `In Review`.
 10. **Next issue in this phase.** The last one goes to step 3, where the phase ships.
+
+**"Unblocked" is defined explicitly**, because the per-milestone model makes the naive
+reading deadlock: a blocker *inside the same phase* is satisfied when its work is committed
+and `In Review`, not when it is `Done`. Issues in a phase reach `Done` together at the merge,
+so waiting for `Done` would hang on the second issue of every phase. A blocker in an earlier
+phase must be `Done`, which it is, because that phase merged first.
 
 **Truthful states.** `In Progress` while working. `In Review` once the issue's work is
 committed to the phase branch and reviewed — nothing has merged yet, so this is where most
@@ -451,7 +472,7 @@ needed a second round, and one of those was a defect the fix itself introduced:
 | Re-opened | Resolution |
 |---|---|
 | `git branch -f <branch> origin/<branch>` — the prescribed way to refresh the integration branch | **Fails, exit 128**, whenever that branch is checked out in any worktree, including the primary checkout this runs in. Confirmed empirically. Replaced with `git checkout <branch> && git pull --ff-only`, and `pull` refusing is now a stop, not something to merge past. |
-| The skill's own `.gitignore` edit tripped its "checkout is dirty" stop condition on the next run | The one-line entry is committed to the integration branch, and the stop condition exempts it |
+| The skill's own `.gitignore` edit tripped its "checkout is dirty" stop condition on the next run | The entry is edited and committed **inside the first phase's worktree**, riding in that phase's PR — never in the primary checkout, never straight to the integration branch |
 | `linear-sync` check 7 still had no guaranteed input | Step 4 now requires keeping a verbatim copy of every description and milestone body before overwriting it |
 | A resume finds its own issues `In Progress` and stops as if a human were mid-work | The ledger accounts for them; the resume check runs after the project is identified, not before |
 
