@@ -9,6 +9,7 @@ A public marketplace of [Claude Code plugins](https://docs.anthropic.com/en/docs
 | Plugin | Description |
 |---|---|
 | [`echo-marketing`](./echo-marketing/) | Brand-aware marketing skills: draft blog and Twitter/X content, review copy against brand guidelines, and author voice documents. |
+| [`echo-linear`](./echo-linear/) | Turn approved specs and plans into Linear projects, milestones and issues written in product language — then deliver them, issue by issue, test-first. Requires the Linear MCP. |
 
 ---
 
@@ -49,8 +50,14 @@ echo-theory-plugins/
 │   │   └── plugin.json             ← plugin manifest
 │   ├── skills/                     ← skill definitions
 │   └── README.md
+├── echo-linear/                    ← installable plugin (needs the Linear MCP)
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   ├── skills/                     ← linear-sync, linear-implement
+│   └── README.md
 ├── docs/
-│   └── brand/                      ← Echo's brand config (example for consumers)
+│   ├── brand/                      ← Echo's brand config (example for consumers)
+│   └── design/                     ← design docs behind each skill
 └── skill-evals/
     ├── evals/                      ← eval rubrics and test fixtures
     ├── _trigger-evals/             ← trigger invocation eval configs and results

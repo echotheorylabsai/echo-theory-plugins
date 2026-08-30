@@ -1,0 +1,109 @@
+# The execution ledger
+
+A multi-issue run outlives a context window. The ledger is what survives it.
+
+## Where it lives
+
+`.linear-implement/<slug>.md` in the **primary checkout** of the repo being worked on.
+
+The **slug is the Linear project identifier**, not its name — stable, unique, and the same
+every session. Fall back to the name lowercased with non-alphanumerics collapsed to `-` only
+if the project has no identifier, and record which you used in the header.
+
+- **Not in a worktree** — per-issue worktrees are removed at the end of each issue and would
+  take the ledger with them.
+- **Never committed.** On first use, create the directory *and* confirm `.linear-implement/`
+  is ignored by the target repo. If it is not, add the line to `.gitignore`, **commit that
+  one-line change to the integration branch**, and say you did. An untracked ledger — or an
+  uncommitted `.gitignore` edit — otherwise dirties the checkout and trips step 0's own stop
+  condition on the next run.
+
+**Created only after the step-1 gate passes.** Nothing reaches disk while the user is still
+being asked.
+
+## What it is not
+
+**Not authoritative.** Linear is the record: issue states and evidence comments carry the
+same facts. Where the two disagree, Linear wins and the ledger is corrected.
+
+If the ledger is lost, rebuild it from Linear rather than from memory. That is the whole
+reason evidence goes into Linear comments and not only here.
+
+## Format
+
+```markdown
+# Content Intelligence v2 — execution ledger
+
+Project      <Linear project identifier>
+Baseline     docs/superpowers/plans/2026-08-20-content-v2-plan.md @ abc1234
+Integration  main
+Started      2026-08-30
+Checkpoints  after Phase A · after Phase B
+
+## Order
+
+| # | Issue | Title | State | PR | Artifacts retained |
+|---|---|---|---|---|---|
+| 1 | ECH-41 | [Phase A.1] Record the baseline | DONE | #123 | branch (squash merge) |
+| 2 | ECH-42 | [Phase A.2] Seal Day 0 | IN PROGRESS | — | — |
+| 3 | ECH-43 | [Phase B.1] Change log | PENDING | — | — |
+
+## ECH-42 — Seal Day 0
+
+Outcome    The Day 0 snapshot is written once and cannot be overwritten.
+Worktree   ../echo-hq-ech-42
+Branch     feat/ech-42-seal-day-0
+Cycles     1 of 3
+
+Criteria
+- [x] A second seal attempt is rejected with a clear error
+- [ ] The seal is recorded with its timestamp and source commit
+- [ ] The existing daily job keeps passing
+
+Decisions
+- Retry budget 3, per plan §Phase A — no source change needed
+
+Findings
+- [ ] Review flagged: empty-response path untested
+
+Stopped
+- Awaiting a decision on row backfill — see the discrepancy comment on ECH-42
+
+## Carried forward
+
+- Nothing outstanding from Phase A.
+```
+
+Keep it terse. It is a working record, not a report — the report is written fresh at the
+close.
+
+## When to update it
+
+| Point | Write |
+|---|---|
+| Immediately after the step-1 gate | Header, order table, checkpoints |
+| Start of an issue | Its section: outcome, criteria, worktree, branch |
+| A decision made | Under `Decisions`, with the evidence |
+| A review finding | Under `Findings`, unchecked |
+| A finding resolved | Check it off |
+| A failed verification cycle | Increment `Cycles` |
+| Blocked, or the grind limit hit | `Stopped` — what happened, what is awaited |
+| End of an issue | State, PR number, retained artifacts, criteria all checked |
+| Each checkpoint | Update `Carried forward` |
+
+## Resuming
+
+After any interruption — a new session, a context reset, a stopped run:
+
+1. Read the ledger.
+2. **Re-read the project and every issue from Linear.**
+3. Where they differ, trust Linear and correct the ledger.
+4. Rebuild what the ledger does not carry: the model, the security invariants, the external
+   gates, the repo instructions. The ledger records progress, not understanding.
+5. **Re-print the delivery plan for what remains and wait for a yes.** The gate belongs to
+   the session, not to the project — the earlier approval was given to a session that is
+   gone.
+6. Then resume at the first issue that is not Done, from step 2, including its re-read.
+
+Never resume from the ledger alone. It records what you intended; Linear records what
+happened.

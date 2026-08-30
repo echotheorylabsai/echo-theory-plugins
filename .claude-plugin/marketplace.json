@@ -14,7 +14,7 @@
     {
       "name": "echo-linear",
       "source": "./echo-linear",
-      "description": "Turn approved specs, PRDs and implementation plans into Linear projects, milestones and issues written in product language, with an adversarial review before anything is reported as done."
+      "description": "Turn approved specs, PRDs and implementation plans into Linear projects, milestones and issues written in product language — then deliver them, issue by issue, test-first, with an adversarial review before anything is reported as done."
     }
   ]
 }

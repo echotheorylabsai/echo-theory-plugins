@@ -26,10 +26,30 @@ a title is read out of context.
 **Adding to an existing project: do not restart the numbering.** List that project's
 issues first, detect the prefix convention already in use, and continue the sequence.
 
+## Write order
+
+The saves depend on each other. Out of order, they fail partway and leave Linear half-built.
+
+```
+1  project        a milestone save requires its project
+2  milestones     an issue is matched to a milestone BY NAME — it must already exist
+3  issues, one at a time, in sequence
+                  a blocked issue needs its predecessor's identifier, both for the
+                  blockedBy relation and for the "Blocked by ECH-41" line in its body
+```
+
+Never batch issue creates. You cannot write an Order line that names an identifier you do
+not have yet.
+
 ## Milestones
 
 **Create every milestone before creating any issue.** An issue is assigned to a milestone
 by name, so the milestone must already exist or the save fails partway through the run.
+
+**Reuse before you create.** List the project's milestones first. If one already carries the
+name a plan phase maps to, **use it** — do not create a second milestone with that name, and
+do not shift the phase to the next free letter. New letters are only for phases the project
+does not already have.
 
 **One plan phase = one milestone.** Nothing else becomes a milestone.
 
@@ -79,6 +99,18 @@ agent can still open.
 
 **Never link a path that does not exist.**
 
+### A repo path cannot be a link attachment
+
+Link attachments need a URL. A repo-relative path is not one, so an unpushed file goes in
+the description's Context line instead, as plain text:
+
+```
+**Context** · Spec `docs/superpowers/specs/2026-08-20-content-v2-design.md` §3
+```
+
+This is the **one** sanctioned exception to "no file paths in the prose". Say in the confirm
+table which sources are unpushed, so the user can push them and get real links instead.
+
 ## Updates must never clobber hand-written text
 
 Descriptions get edited by hand. A full-description rewrite destroys that work.
@@ -115,8 +147,13 @@ irreversible. Asking costs one message.
 
 ### Keep the cap when updates accumulate
 
-Each dated callout costs roughly 40 words. Four updates will push a 250-word issue over
-its cap, and the description degrades into a changelog.
+**A dated callout does not count toward the word cap.** The cap governs the description a
+reader is meant to absorb; the callouts sit above it. Without this, every update to a
+cap-sized issue or milestone would be impossible — trimming to fit destroys hand-written
+text, which is the one thing these rules exist to prevent.
+
+What is capped instead is the **number** of callouts, because the description degrades into
+a changelog long before it degrades into a long one.
 
 **Before prepending a new callout, count the ones already there.**
 
@@ -124,12 +161,14 @@ its cap, and the description degrades into a changelog.
 - When adding a third, move the **oldest** one into a Linear comment on that issue, then
   delete it from the description with an anchored `replace`.
 - The description stays a description. The comment thread carries the history.
+- **A milestone has no comment thread.** At a third callout on a milestone, fold the oldest
+  into a comment on the project instead, and say you did.
 
 ### Traps
 
 | Field | Behaviour |
 |---|---|
-| `labels` | **Replaces the entire set.** Always re-send the full intended set, or existing labels are silently dropped. |
+| `labels` | **Replaces the entire set.** `get` the issue and read its current labels *before* writing any, then send the full intended set — otherwise existing labels are silently dropped. |
 | `links`, `blocks`, `blockedBy`, `relatedTo` | Append-only. Safe to add to. |
 | `patch` | Each anchor must match **exactly once**. One failing op aborts the whole save — nothing changes, which is safe but silent. |
 | `patch` anchors | Must match what Linear **stored**, not what you sent. Its parser rewrites markdown on save. **Always `get` the issue first and copy the anchor from the stored text.** |

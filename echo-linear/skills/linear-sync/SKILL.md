@@ -1,6 +1,6 @@
 ---
 name: linear-sync
-description: Use when work agreed in this conversation needs to reach Linear as projects, milestones or issues, or when existing Linear artifacts need updating from newly approved decisions. Triggers include "put this in Linear", "create the Linear issues", "update the Linear project", or finishing a spec, PRD, design doc or implementation plan that someone now has to build.
+description: Use when work agreed in this conversation needs to reach Linear as projects, milestones or issues, or when existing Linear artifacts need updating from newly approved decisions. Triggers include "put this in Linear", "create the Linear issues", "update the Linear project", or finishing a spec, PRD, design doc or implementation plan that someone now has to file. Do NOT use for building the work those issues describe — that is linear-implement.
 ---
 
 # linear-sync
@@ -34,12 +34,17 @@ explicitly agreed in chat, and the relevant code.
 
 Then reflect critically. Answer each, out loud, before going further:
 
-- Is the scope **agreed**, or still being debated? A proposal is not an approval.
+- Is the scope **agreed**, or still being debated? A proposal is not an approval. Agreed
+  means the user said build this, or approved a document that says so. A plan file you
+  found is not an approval on its own — ask.
 - Do I know the goal, who it is for, and how we would know it worked?
 - Can I write acceptance criteria that are **checkable**, not vague?
-- Do the components, surfaces or products I would name **actually exist** in the repo? Verify.
+- Do the components this work **depends on** actually exist in the repo? Verify. A
+  component the work **creates** is expected to be absent — that is not a gap.
 - Create or update — and if update, exactly which project or issue?
-- If linking files: do they exist? Are they committed and pushed?
+- If linking files: do they exist? Are they committed? Pushed files get a URL; unpushed
+  ones get a repo path — see `references/conventions.md`. Neither is a stop. A file that
+  does not exist is.
 
 **Any gap → STOP. Ask clarifying questions. Write nothing to Linear.**
 
@@ -50,11 +55,18 @@ guess is worse than no issue: it looks authoritative and it is already live.
 
 Pick one tier and say which, with a one-line reason.
 
-| Tier | Input | Creates |
-|---|---|---|
-| 1 | A chat agreement, or one change | Issues only, on an existing project. If none is named, **ask** — never guess, never create a project to dodge the question. |
-| 2 | A spec or PRD, no phased plan | New project + flat issues |
-| 3 | A spec + a phased implementation plan | New project + milestones from phases + issues |
+| Tier | Input | Creates | Titles |
+|---|---|---|---|
+| 1 | A chat agreement, or one change | Issues only, on an existing project. If none is named, **ask** — never guess, never create a project to dodge the question. | continue the project's existing convention |
+| 2 | A spec or PRD, no phased plan | New project + flat issues | simple — `1. Title` |
+| 3 | A spec + a phased implementation plan | New project + milestones from phases + issues | complex — `[Phase A.1] Title` |
+
+**A named existing project overrides the tier's "new project".** Tier 3 material going into
+a project the user named adds milestones and issues to it — it never creates a second
+project.
+
+**Read Linear before you shape.** For any existing project, list its issues and milestones
+now, not at step 4 — the numbering and milestone names you print at step 3 depend on them.
 
 **Minimum-issue discipline.** Think hard about the fewest issues that cover the work:
 
@@ -90,7 +102,15 @@ If they amend, re-print and wait again.
 
 Follow `references/formats.md` for what goes in each description, and
 `references/conventions.md` for titles, labels, **milestones**, links, relations and the
-**safe-update rules**. Record the identifier and URL of every artifact you touch — step 5 needs the list.
+**safe-update rules** — including the write order, which is not optional.
+
+**Before you overwrite anything, keep a verbatim copy of it.** Every existing description
+and milestone body you are about to change, saved as you read it. Once the save lands the
+old text is unrecoverable, and step 5's "nothing was destroyed" check has nothing to compare
+against.
+
+Record the identifier and URL of every artifact you touch — step 5 needs that list and
+those copies.
 
 ## 5. Adversarial review
 
