@@ -37,7 +37,12 @@ describing something else has failed. Reconciliation runs before every phase and
 phase: `references/reconciliation.md`.
 
 This skill never creates a Linear project, milestone or issue. It executes what is already
-approved. **If the project does not exist yet, stop and hand back to `linear-sync`.**
+approved.
+
+**Hand back to `linear-sync` whenever the work needs a Linear artifact that does not exist**
+— no project yet, an approved change that needs a new issue, work that has to be re-scoped
+across issues, or a phase that needs a milestone. Say what is needed and why, then stop. Do
+not improvise around the missing artifact, and do not create it yourself.
 
 ### Source precedence
 
@@ -156,9 +161,16 @@ misses the goal. Full procedure: `references/reconciliation.md`.
 
 ### Then, one issue at a time
 
-Work only on the **next unblocked issue that is not already Done**. Before setting it In
-Progress, re-read its current Linear record and every linked source — either may have
-changed since step 0.
+Work the phase's issues in order, one at a time, skipping any already Done.
+
+**What "unblocked" means here.** A blocker inside the same phase is satisfied when its work
+is **committed and `In Review`** — not when it is `Done`. Issues in a phase all reach `Done`
+together when the phase PR merges, so waiting for `Done` would deadlock on the second issue
+of every phase. A blocker in an **earlier** phase must be `Done`, which it is, because that
+phase merged before this one started.
+
+Before setting an issue In Progress, re-read its current Linear record and every linked
+source — either may have changed since step 0.
 
 Method for steps 2–7 is in `references/execution-method.md`. **Read it before step 2.**
 
@@ -242,12 +254,20 @@ Every issue in the phase is committed and `In Review`. Now the phase lands:
    into the phase branch and **re-run verification** — green from before the integration
    proves nothing. A conflict is a stop. See `references/execution-method.md`.
 2. **Open the PR** for the phase branch, listing each issue and its evidence.
-3. **If a human must approve it, say so, report, and wait.** Do not start the next phase —
+3. **If a human must approve or merge it, say so, report, and wait** — hand back with the PR
+   link and "tell me when it has merged, or what to change." Do not start the next phase;
    its worktree would be cut from a branch that does not contain this one.
+
+   **Re-entry.** When the user says it merged, resume at step 4 — do not restart the phase
+   and do not re-run pre-flight. If they bring back **review feedback** instead: apply it on
+   the phase branch, re-verify, push, and return here. Feedback that changes behaviour,
+   acceptance criteria or scope is a **material change** — take it through that gate before
+   implementing it, even though a human asked for it.
 4. **Re-sync again before merging** — it can move between opening and merging. Once merged,
    **confirm from the remote** that it landed on the intended integration branch. Under a
    squash or rebase merge, confirm by content, not commit ancestry.
-5. Move every issue in the phase to **`Done`**, and update the Linear project record.
+5. Move every issue in the phase from `In Review` to **`Done`**, and update the Linear
+   project record. This is the only place issues become Done.
 6. **Post-flight — make the record match what shipped.** Update the plan's section for this
    phase, patch any issue whose description no longer describes what landed, fix the
    milestone body if its "accepted when" moved, and patch **remaining** issues this phase

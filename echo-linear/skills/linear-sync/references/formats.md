@@ -4,6 +4,11 @@ Written for a non-engineer. Plain language, short lines, no jargon, no long para
 
 **Word caps are hard.** If a section will not fit, the content is wrong — not the cap.
 
+The `~` means one thing only: **do not count words to three decimal places.** Under the
+number is fine, a little over is fine, half again as long is not. The review check fails a
+description that is visibly padded or visibly over, not one at 265 words. Dated callouts do
+not count toward it at all.
+
 **Do not write `**Label:**` immediately before a link** — Linear's parser renders it as
 `**Label: **[link]`, with the space inside the bold. Use `**Label** · [link]` instead.
 

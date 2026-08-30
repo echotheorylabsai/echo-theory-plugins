@@ -26,12 +26,19 @@ git worktree add ../<repo>-phase-a -b feat/<phase-slug> <integration-branch>
 out in any worktree — including the primary checkout, which is where this runs — and fails
 with exit 128 before anything is cut. `checkout` + `pull --ff-only` is the working form.
 
-If `pull --ff-only` refuses, the local branch has commits the remote does not. **Stop and
-ask** — do not merge, rebase or reset your way past it.
+If `pull --ff-only` refuses, read *why* before concluding anything — the two causes need
+opposite responses:
+
+| Message | Cause | Do |
+|---|---|---|
+| `Your local changes to <file> would be overwritten` | The primary checkout has uncommitted edits | Find out whose. If they are yours, you put them in the wrong place — move them to a worktree. If they are not, **stop and ask**. Never discard them |
+| `Not possible to fast-forward` / divergent branches | The local branch has commits the remote does not | **Stop and ask** — do not merge, rebase or reset past it |
 
 Branch name: `feat/<phase-slug>`, e.g. `feat/phase-a-instrument`. A project with no
 milestones uses the checkpoint boundaries confirmed at step 1 as its branch boundaries — the
-two are the same thing. Use the repo's own convention if it has one; check recent branches
+two are the same thing — and names each branch for the issues it carries:
+`feat/<project-slug>-ech-41-ech-42`, or `feat/<project-slug>-batch-1` when that is unwieldy.
+Put the chosen names in the step-1 plan so they are approved with everything else. Use the repo's own convention if it has one; check recent branches
 and any contributing guide first.
 
 **Commit per issue.** Each issue gets its own commit or commits on the phase branch, with
@@ -99,8 +106,10 @@ boundaries. Repeated re-syncs are a signal, not just a chore.
 ### Someone else may be running this too
 
 At step 0, note any other worktrees or recent branches that suggest concurrent work, and say
-so in the delivery plan. An issue already `In Progress` that your ledger does not account for
-means someone else is in there — stop and ask, do not take it over.
+so in the delivery plan. An issue `In Progress` that no record can explain — no evidence
+comment, no branch — means someone else is in there: stop and ask, do not take it over. An
+issue your ledger *or* a ledger rebuilt from Linear accounts for is your own earlier run
+(`ledger.md` § Resuming).
 
 ## Test first
 
@@ -149,7 +158,8 @@ implementer per independent task and a **separate, read-only** reviewer after ea
 
 ## Independent review
 
-After each issue's implementation passes verification, before the PR.
+After each issue's implementation passes verification, **before committing it** to the phase
+branch. Not once per phase — once per issue.
 
 Give the reviewer the current code, the tests, the approved acceptance criteria and the
 evidence — **not your reasoning**. The point is to find the gap between what you meant and
@@ -159,13 +169,23 @@ what is there.
 - **Harness without:** run an explicit fresh-context pass that separates verified facts,
   assumptions, and external gates.
 
-Fix material findings, re-run verification, and re-review after any material change. Carry
-unresolved findings into the ledger — never past the close.
+Fix **significant** findings, re-run verification, and re-review after a significant change.
+Carry unresolved findings into the ledger — never past the close.
+
+**"Significant" here is not "material."** A significant review finding is one worth fixing
+before shipping. *Material* is the term reserved for the gate that halts the run and asks the
+user, and it applies only to the categories listed in `SKILL.md`. A review nit is not a
+reason to stop and ask.
 
 ## Grind limit
 
 A **verification cycle** is one implement-then-verify attempt *after* the first
-deliberately-failing test. The red test itself is not a failure.
+deliberately-failing test. The red test itself is not a failure, and neither is a re-run
+after fixing a review finding — the counter tracks failures to satisfy the issue's own
+criteria, nothing else.
+
+**The counter resets** when the user reviews a stop and says continue, and at the start of
+each issue. Record it in the ledger so a resumed session does not inherit a stale count.
 
 Three failed cycles on one issue is the stop. Commit the work in progress to its branch so
 the evidence survives, record what failed, what you tried and what you believe is wrong,
@@ -194,10 +214,10 @@ Then:
 1. Confirm the exact dedicated feature-worktree path — **never the primary checkout** — the
    feature branch, the integration branch, and that no remaining worktree has the feature
    branch checked out.
-2. Move every issue in the phase from `In Review` to `Done`, and confirm each record is
-   accurate — the evidence comment written when its work completed should now name the
-   merged phase PR. Re-read them. Add a comment **only** if something new is true: the merge
-   landed differently, or an artifact is being retained. Do not post second "done" comments.
+2. Confirm each issue's record is accurate — the states were already set to `Done` at
+   checkpoint step 5; do not set them again. Re-read them. Add a comment **only** if
+   something new is true: the merge landed differently, or an artifact is being retained. Do
+   not post second "done" comments — the phase PR link lives in the project status update.
 3. From the primary checkout, remove **only that exact worktree** — `git worktree remove
    <path>`. If it refuses because of untracked build artifacts (`__pycache__`,
    `.pytest_cache`, coverage output), delete those files and retry. **Never

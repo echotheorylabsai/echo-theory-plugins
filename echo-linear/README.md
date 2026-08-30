@@ -3,7 +3,10 @@
 Turn what was **approved** in a working session into Linear artifacts a product manager
 can read and a coding agent can act on alone — then build them.
 
-Works in Claude Code and Codex. Both need the Linear MCP configured.
+Written to work in Claude Code and Codex — no harness-specific tool names, and a stated
+fallback wherever subagents are assumed. Both need the Linear MCP configured. **Only the
+Claude Code install path is packaged here**; Codex users load the skill files directly, and
+that path has not been verified yet.
 
 ```
 discussion / spec / plan  ──linear-sync──▶  Linear project  ──linear-implement──▶  merged PRs
@@ -94,7 +97,7 @@ data — and the code forces it. If it has to be argued, it is material.
 | Create Linear artifacts | That is `linear-sync`. |
 | Mark work Done early | Done needs criteria, verification, review *and* a confirmed merge. A blocked issue is never Done. |
 | Grind | Three failed verification cycles on one issue stops the run. |
-| Merge past a human | If PRs need approval, it opens one, sets `In Review`, and waits. |
+| Merge past a human | If a PR needs approval, it opens one, hands you the link, and waits for you to say it merged or what to change. |
 | Deploy | Deployment is a gate it verifies, never an action it takes. |
 | Force-delete anything | A branch that resists a safe delete is kept and reported. Never a force-push either. |
 | Assume the branch stood still | Other agents merge while it works. It re-syncs before the PR and before the merge, and re-runs the tests each time — a clean merge can still be semantically broken. |

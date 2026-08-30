@@ -17,7 +17,7 @@ There is no `Blocked` state. Full workspace facts:
 | The phase PR merged and was confirmed from the remote | `Done` — set for every issue in that phase at the checkpoint |
 | Unstarted | `Backlog` / `Todo` — leave as found |
 | Found `Canceled` or `Duplicate` at step 0 | Skip it. Do not resurrect it; say so in the delivery plan |
-| Found already `In Progress` or `Done` at step 0 | Stop and ask — **unless** the ledger for this project accounts for it, in which case it is your own earlier run and you resume |
+| Found already `In Progress` or `Done` at step 0 | Resume if the ledger — read or rebuilt from Linear per `ledger.md` § Resuming — accounts for it. Stop and ask only when Linear shows work no record can explain: an issue `In Progress` with no evidence comment and no branch means someone else is in there |
 
 **A blocked issue is never Done.** State is a claim about reality, not a courtesy to the
 run's tidiness. Never move an issue to Done to make a report look finished.
@@ -45,8 +45,9 @@ exists. Concise.
 **Gate** — none outstanding
 ```
 
-At the checkpoint, the phase PR link goes in the **project** status update, not in a second
-comment on every issue.
+**The PR does not exist yet when this is written, and that is fine.** Naming the branch and
+the phase is enough. At the checkpoint the PR link goes in the **project** status update —
+never as a second comment on every issue, and never by patching this one.
 
 Include `Decision` and `Gate` lines only when there is one. Omit rather than pad.
 

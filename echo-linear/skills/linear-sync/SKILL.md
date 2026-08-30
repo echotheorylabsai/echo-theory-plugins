@@ -60,11 +60,20 @@ guess is worse than no issue: it looks authoritative and it is already live.
 
 Pick one tier and say which, with a one-line reason.
 
-| Tier | Input | Creates | Titles |
+**Tier is decided by the shape of the work, not by whether a file exists.** An agreement
+reached in chat counts as its source; a written spec is better, not required.
+
+| Tier | The work is | Creates | Titles |
 |---|---|---|---|
-| 1 | A chat agreement, or one change | Issues only, on an existing project. If none is named, **ask** — never guess, never create a project to dodge the question. | continue the project's existing convention |
-| 2 | A spec or PRD, no phased plan | New project + flat issues | simple — `1. Title` |
-| 3 | A spec + a phased implementation plan | New project + milestones from phases + issues | complex — `[Phase A.1] Title` |
+| 1 | Additions to a project that **already exists** — whatever the source | Issues only, on that project | continue the project's existing convention |
+| 2 | A new body of work with **no phases** | New project + flat issues | simple — `1. Title` |
+| 3 | A new body of work **organised into phases** | New project + milestones from phases + issues | complex — `[Phase A.1] Title` |
+
+Tier 1 is about the *target*; tiers 2 and 3 about the *shape*. A phased plan going into a
+project that already exists is tier 1 with milestones added — never a second project.
+
+**If no project exists and none is named, tiers 2 and 3 create one.** Do not ask which
+project to use when the answer is that there isn't one yet.
 
 **A named existing project overrides the tier's "new project".** Tier 3 material going into
 a project the user named adds milestones and issues to it — it never creates a second
@@ -86,20 +95,30 @@ now, not at step 4 — the numbering and milestone names you print at step 3 dep
 
 Print the plan and wait. Nothing is written until the user says yes.
 
+Show everything that will be written — including the wiring the user cannot see later
+without hunting for it.
+
 ```
 WILL CREATE
   Project  Content Intelligence v2
   Phase A · Instrument
     [Phase A.1] Record the baseline   Feature/platform
-    [Phase A.2] Seal Day 0            Feature/platform
+    [Phase A.2] Seal Day 0            Feature/platform   ← blocked by A.1
   Phase B · Report
-    [Phase B.1] Change log            Feature/echo-hq
+    [Phase B.1] Change log            Feature/echo-hq    ← blocked by A.2
+
+  Sources   Spec + plan, both pushed — real links
+  Dates     none set
 
 WILL UPDATE
   ECH-44   prepend dated callout
 
 Proceed?
 ```
+
+Blocking relations, target dates, and whether the source links are real URLs or local-only
+paths all go in the table. They are what step 5 checks and the only record of what was
+approved — anything absent here cannot be recovered later.
 
 If they amend, re-print and wait again.
 

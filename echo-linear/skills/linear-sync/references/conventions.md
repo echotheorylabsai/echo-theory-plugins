@@ -1,17 +1,31 @@
 # Linear conventions
 
-Workspace facts verified 2026-08-29. Re-check with the Linear MCP if anything looks stale.
+## Workspace — discover it, do not assume it
 
-## Workspace
+This plugin is installed in workspaces other than the one it was written for. **List the
+teams, states and labels from Linear before the confirm gate**, and shape the plan against
+what you actually find.
 
-- **One team:** `Echotheorylabs`, key `ECH`. Never ask which team.
-- **No templates exist.** This skill carries its own format.
-- **States:** `Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`.
-- **Labels — type:** `Bug`, `Feature`, `Improvement`.
-- **Labels — area:** `platform`, `echo-hq`, `content-agent`, `support-agent`,
-  `research-agent`, `outreach-agent`, `mcp-connector`, `context-layer`.
+The values below are Echo Theory Labs' workspace, verified 2026-08-29. Treat them as the
+expected case, not as fact.
 
-**Never invent a new label, state or template.**
+| | Echo Theory Labs |
+|---|---|
+| Team | `Echotheorylabs`, key `ECH` — the only one, so never ask which |
+| Templates | none; this skill carries its own format |
+| States | `Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate` |
+| Labels — type | `Bug`, `Feature`, `Improvement` |
+| Labels — area | `platform`, `echo-hq`, `content-agent`, `support-agent`, `research-agent`, `outreach-agent`, `mcp-connector`, `context-layer` |
+
+**What to do when the workspace differs:**
+
+- **More than one team** → ask which, once. Do not guess.
+- **No `Backlog` state** → use the workspace's own unstarted state and say which you picked.
+- **No type/area label pair** → say so in the confirm table and file with the labels that do
+  exist, or none. Do not force issues into a scheme this workspace has not got.
+
+**Never invent a label, state or template.** Use what exists, or state plainly that it does
+not.
 
 ## Titles and sequencing
 
@@ -51,6 +65,22 @@ name a plan phase maps to, **use it** — do not create a second milestone with 
 do not shift the phase to the next free letter. New letters are only for phases the project
 does not already have.
 
+**Same intent, different name** — an existing `Phase A · Instrument` against a plan phase
+called `Instrumentation` — is not yours to decide. Show both in the confirm table and ask
+whether to reuse or add a new phase.
+
+### Adding issues to a milestoned project (tier 1)
+
+Every issue in a project that has milestones needs one. Which milestone the new issues take
+depends on what they are:
+
+- **Continuing existing work** → the milestone that work belongs to, numbering on from its
+  last issue.
+- **A new phase of work** → a new milestone, continuing the letter sequence.
+
+If it is not obvious which, **put both options in the confirm table and ask.** Attaching
+issues to the wrong phase silently corrupts the roadmap.
+
 **One plan phase = one milestone.** Nothing else becomes a milestone.
 
 - If the plan has no phases, the project has no milestones. **Never invent phases the plan
@@ -68,11 +98,11 @@ and `Phase B` gets `Phase C`, never a second `Phase A`.
 
 | Field | Value |
 |---|---|
-| team | `Echotheorylabs` |
+| team | the workspace's team — `Echotheorylabs` here; ask when there is more than one |
 | project | the tier's project |
 | milestone | the phase this issue belongs to; omit when the project has no milestones |
-| labels | exactly two — one type + one area |
-| state | `Backlog` |
+| labels | one type + one area where both exist. Fewer only when the workspace has no such scheme — say so in the confirm table |
+| state | the workspace's unstarted state — `Backlog` here |
 | title | per the table above |
 | links | spec and plan URLs as link attachments |
 | blocks / blockedBy | per **Dependencies** below |

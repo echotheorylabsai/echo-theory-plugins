@@ -15,13 +15,15 @@ if the project has no identifier, and record which you used in the header.
 - **Never committed.** On first use, create the directory *and* confirm `.linear-implement/`
   is ignored by the target repo.
 
-  If it is not, add the line to `.gitignore` and **fold that one-line change into the first
-  phase's PR** — never commit it straight to the integration branch. A direct commit skips
-  review and fails outright on a protected branch. Mention it in the step-1 plan so the user
-  is not surprised by an unrelated line in that PR.
+  If it is not, **make and commit that `.gitignore` edit inside the first phase's worktree**,
+  so it rides along in that phase's PR. Never edit `.gitignore` in the primary checkout: an
+  uncommitted change there makes the next `git pull --ff-only` abort, and never commit it
+  straight to the integration branch — that skips review and fails outright on a protected
+  branch. Mention it in the step-1 plan so an unrelated line in that PR is not a surprise.
 
-  Until it merges, the ledger and that `.gitignore` edit are the only uncommitted changes
-  step 0 tolerates.
+  Until that PR merges, the ledger directory is untracked in the primary checkout. That is
+  expected, and it is the only uncommitted thing step 0 tolerates. An untracked directory
+  does not block a pull.
 
 **Created only after the step-1 gate passes.** Nothing reaches disk while the user is still
 being asked.
@@ -51,7 +53,7 @@ Checkpoints  after Phase A · after Phase B
 |---|---|---|---|---|---|
 | 1 | ECH-41 | [Phase A.1] Record the baseline | A | IN REVIEW | not opened |
 | 2 | ECH-42 | [Phase A.2] Seal Day 0 | A | IN PROGRESS | — |
-| 3 | ECH-43 | [Phase B.1] Change log | B | PENDING | — |
+| 3 | ECH-43 | [Phase B.1] Change log | B | Backlog | — |
 
 ## Phase A · Instrument
 
@@ -106,15 +108,21 @@ close.
 
 After any interruption — a new session, a context reset, a stopped run:
 
-1. Read the ledger.
-2. **Re-read the project and every issue from Linear.**
-3. Where they differ, trust Linear and correct the ledger.
-4. Rebuild what the ledger does not carry: the model, the security invariants, the external
+1. Read the ledger. **If there is none** — a different machine, a cleared checkout — rebuild
+   it from Linear rather than stopping: issue states plus evidence comments carry the same
+   facts. Say that you rebuilt it, and that the pre-`In Review` detail is gone.
+2. Take the rebuilt ledger as the account of any issue already `In Progress` or `Done`.
+   Only stop and ask if Linear shows work the rebuilt record cannot explain — for example an
+   issue `In Progress` with no evidence comment and no branch.
+3. **Re-read the project and every issue from Linear.**
+4. Where they differ, trust Linear and correct the ledger.
+5. Rebuild what the ledger does not carry: the model, the security invariants, the external
    gates, the repo instructions. The ledger records progress, not understanding.
-5. **Re-print the delivery plan for what remains and wait for a yes.** The gate belongs to
+6. **Re-print the delivery plan for what remains and wait for a yes.** The gate belongs to
    the session, not to the project — the earlier approval was given to a session that is
    gone.
-6. Then resume at the first issue that is not Done, from step 2, including its re-read.
+7. Then resume at the first issue that is not Done, from step 2, including its pre-flight
+   and its re-read.
 
 Never resume from the ledger alone. It records what you intended; Linear records what
 happened.
