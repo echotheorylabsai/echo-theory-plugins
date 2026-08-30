@@ -480,7 +480,37 @@ Two further wording fixes: an unverifiable claim that an uncommitted source is "
 since planning" became an explicit uncertainty stated in the delivery plan, and the resume
 check was reordered after project identification, which it depends on.
 
-**Not yet done.** Design §11's live verification plan is outstanding — nothing has been run
-against a real Linear workspace, and neither skill has been installed or invoked from Codex.
-The acceptance criterion in §10 ("invocable in both tools, not merely present on disk") is
-**unmet**.
+### Rounds five to seven
+
+Three further rounds followed the per-milestone, concurrency and reconciliation work.
+
+**Round five — 16 defects.** A deadlock on the *primary* scenario: `linear-sync` chains
+`blockedBy` within a phase, and the per-milestone change made issues reach `Done` only at the
+phase merge — so the second issue of every phase waited on a blocker that could not clear
+until it was itself finished. Separately, the adversarial reviewer was told both to report
+only and to fix, with only a *conditional* prohibition on a milestone full-replace: the one
+irreversible operation in this workspace, performed by the very check meant to catch it.
+
+**Round six — verdict *do not approve*, three blockers.** The load-bearing one: reconciliation
+guarantees it only records approved changes, and its test is naming where approval happened —
+but nothing required approval to be recorded durably. Approval given in chat dies with the
+session, leaving a later run unable to tell an approved deviation from drift, with the plan a
+previous phase had already rewritten as its only, circular, evidence. The material path now
+posts an approval-record comment before acting, and reconciliation cites it. Also: a clean
+merge that silently breaks your work had no defined response, and resume keyed on a local
+ledger file so a new machine would start fresh over live work.
+
+Four accuracy errors were caught by testing the live MCP schema rather than reading it:
+milestones *do* take comments, a milestone update requires `project`, blocking relations *can*
+be removed, and the `--ff-only` claim was overstated.
+
+**Round seven is running against this text; its result is not yet recorded.**
+
+### Still outstanding
+
+Design §11's live verification plan — nothing has been run against a real Linear workspace,
+and neither skill has been installed or invoked from Codex. The acceptance criterion in §10
+("invocable in both tools, not merely present on disk") is **unmet**.
+
+Every round so far has found real defects, several of them in the previous round's fixes.
+That rate has not yet flattened.
