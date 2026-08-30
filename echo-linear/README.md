@@ -62,8 +62,20 @@ turns out to be wrong:
    test first, an independent review, its own commit, a truthful Linear state.
 3. **Checkpoint** — the phase ships as one PR, merges, and every issue in it goes Done.
    Then it stops and waits before the next phase.
-4. **Close** — re-reads everything from Linear, runs a final whole-project review, and
-   reports the gaps plainly.
+4. **Close** — re-reads everything from Linear, reconciles every doc against the code, runs
+   a final whole-project review, and reports the gaps plainly.
+
+### Docs stay true
+
+Agents pivot mid-build — blockers appear, assumptions turn out wrong. So before every phase
+it checks that the phase's issues and docs still describe reality, and after every phase it
+updates the spec, the plan and the Linear records to match what actually shipped.
+
+**It only records changes that were approved.** A difference nobody agreed to is a stop, not
+a doc edit — otherwise reconciliation just launders drift into fact.
+
+When the project closes, the report says either "every doc matches the code, checked against
+this commit" or names exactly which ones don't.
 
 ### The third gate
 

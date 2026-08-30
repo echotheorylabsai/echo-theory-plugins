@@ -64,6 +64,7 @@ echo-linear/skills/linear-implement/
 └── references/
     ├── execution-method.md     isolation, test-first, delegation, review, cleanup
     ├── linear-updates.md       truthful states, evidence comments, safe-update traps
+    ├── reconciliation.md       keeping specs, plans and Linear true to the code
     └── ledger.md               the durable execution record
 ```
 
@@ -265,6 +266,28 @@ has shipped.
 back all of its issues together. `linear-sync` already targets 1–4 issues per milestone,
 which keeps that blast radius small.
 
+### 6.5b Reconciliation — the docs are a deliverable
+
+Coding agents pivot mid-build; blockers appear and approaches get replaced. A project that
+ships correct code and leaves a spec describing something else has failed a required
+outcome, because the next person to read it builds on the lie.
+
+So reconciliation runs **twice per milestone and once at the close**:
+
+| When | What |
+|---|---|
+| **Pre-flight**, before a phase's first issue | Are this phase's issues still achievable and still meaningful against the code earlier phases produced? An invalidated premise stops the phase before any code is written |
+| **Post-flight**, after the phase merges | Update the plan's section, patch any issue whose description no longer matches what landed, fix the milestone body, and patch remaining issues this phase changed the premise of |
+| **Close** | Full pass over spec, plan, project, milestones and every issue against the code that exists |
+
+**The rule that keeps it honest: reconciliation is descriptive, never decisional.** It
+records changes that were already approved. It never rewrites a document to match code that
+deviated without approval — that would turn drift into fact and erase the record of what was
+agreed. An unapproved difference is the material-change gate, not a doc edit. *If you cannot
+name where a change was approved, it was not approved.*
+
+Full procedure: `references/reconciliation.md`.
+
 ### 6.6 Step 4 — close honestly
 
 Re-read the project and every issue from Linear. Confirm that every required **outcome** —
@@ -398,6 +421,7 @@ either.
 | Resume | Re-prints the plan and re-asks; the gate belongs to the session |
 | Merge authority | Named in the step-1 plan; a human-approval repo routes through `In Review` |
 | Force | Never — on a branch, a worktree, or a push |
+| Doc hygiene | Reconciliation before every phase, after every phase, and at the close. Descriptive only: it records approved changes, and an unapproved difference is a stop, never a doc edit |
 | Concurrency | `origin/<integration-branch>` is a moving target: re-sync before the worktree, before the PR and before the merge, and re-verify after each. A conflict with another agent's work is a stop |
 | Blocked state | Stays `In Progress` with a comment; the workspace has no `Blocked` |
 

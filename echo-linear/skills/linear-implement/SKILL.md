@@ -20,15 +20,21 @@ file; `../../linear-sync/…` from inside `references/`.
 ```
 0  ADOPT       read the whole project + approved sources → state the model
 1  GATE        show the delivery plan → wait for an explicit yes
-2  ISSUE       next unblocked issue only, in this phase's worktree: re-read →
-               test-first → implement → independent review → commit → In Review
-3  CHECKPOINT  phase ships: re-sync → PR → re-sync → merge → all its issues Done
-               → clean up → report → wait
-4  CLOSE       whole-project review, final verification, honest report
+2  PHASE       PRE-FLIGHT: are this phase's issues and docs still true? → then
+               per issue: re-read → test-first → implement → independent
+               review → commit → In Review
+3  CHECKPOINT  phase ships: re-sync → PR → re-sync → merge → issues Done →
+               POST-FLIGHT: make the docs and Linear match what shipped →
+               clean up → report → wait
+4  CLOSE       full reconciliation, whole-project review, honest report
 ```
 
 Step 1 and step 3 are gates. So is the **material-change decision** inside step 2.
 **None may be skipped — not even on a one-issue project, and not on a resume.**
+
+**The docs are a deliverable.** A project that ships correct code and leaves a spec
+describing something else has failed. Reconciliation runs before every phase and after every
+phase: `references/reconciliation.md`.
 
 This skill never creates a Linear project, milestone or issue. It executes what is already
 approved. **If the project does not exist yet, stop and hand back to `linear-sync`.**
@@ -133,7 +139,22 @@ Only after the yes: open the ledger (`references/ledger.md`) and post **one** co
 project status update — goal, order, dependencies, material risks or gates, next unblocked
 issue. Not a restatement of the plan.
 
-## 2. Execute, one issue at a time
+## 2. Execute a phase
+
+### Pre-flight — before the first issue of every phase
+
+Earlier phases changed the codebase; this phase's issues were written before that happened.
+
+Re-read this phase's issues from Linear and the sources they link, and check them against
+the code **as it now stands**: are the acceptance criteria still achievable and still
+meaningful, do the components each issue depends on now exist, does the plan's approach
+still fit what it will build on, do the dependencies still hold?
+
+**An issue whose premise the last phase invalidated stops the phase.** Report and ask before
+writing code — building against a stale criterion produces work that passes its issue and
+misses the goal. Full procedure: `references/reconciliation.md`.
+
+### Then, one issue at a time
 
 Work only on the **next unblocked issue that is not already Done**. Before setting it In
 Progress, re-read its current Linear record and every linked source — either may have
@@ -227,8 +248,14 @@ Every issue in the phase is committed and `In Review`. Now the phase lands:
    **confirm from the remote** that it landed on the intended integration branch. Under a
    squash or rebase merge, confirm by content, not commit ancestry.
 5. Move every issue in the phase to **`Done`**, and update the Linear project record.
-6. **Clean up** the worktree and branch per `references/execution-method.md`.
-7. Report to the user: issues shipped with their evidence, findings, risks, what comes next.
+6. **Post-flight — make the record match what shipped.** Update the plan's section for this
+   phase, patch any issue whose description no longer describes what landed, fix the
+   milestone body if its "accepted when" moved, and patch **remaining** issues this phase
+   changed the premise of. Only for changes that were approved — an unapproved difference is
+   the material gate, not an edit. `references/reconciliation.md`.
+7. **Clean up** the worktree and branch per `references/execution-method.md`.
+8. Report: issues shipped with their evidence, **what you reconciled**, findings, risks, what
+   comes next.
 
 **Wait for a yes before starting the next milestone.**
 
@@ -241,15 +268,22 @@ which issues are on an unmerged branch; none of them has shipped.
 Re-read the project and every issue from Linear. Never close from memory of what you
 built.
 
+**Run the full reconciliation pass** (`references/reconciliation.md`): read the spec, the
+plan, the project, every milestone and every issue against the code that now exists.
+
 Confirm that every required **outcome** — not merely every task — meets its approved
-acceptance criteria; that implementation and documentation are current; that required
-verification and independent reviews passed; and that every external gate is satisfied or
-explicitly accepted as a separate follow-up.
+acceptance criteria; that required verification and independent reviews passed; and that
+every external gate is satisfied or explicitly accepted as a separate follow-up.
 
 Then run the final relevant repository verification and **one final independent
 whole-project review**. Fix and re-review material findings before claiming anything.
 
-Report: verified results, external assumptions, completed issues, remaining gates, gaps.
+Report: verified results, external assumptions, completed issues, remaining gates, gaps —
+and state plainly **either** that every document and Linear record describes what was built,
+naming the commit or PR you checked against, **or** exactly which ones do not and why.
+
+**A project that ships correct code and leaves a misleading spec has failed a required
+outcome.** The next person to read it builds on the lie.
 
 **Never mark the project Done while a required outcome sits behind an unsatisfied external
 gate**, unless the approved workflow explicitly reclassified it as a separate follow-up.
@@ -275,4 +309,7 @@ gate**, unless the approved workflow explicitly reclassified it as a separate fo
 | "I fetched at the start of the phase, so I am current" | Other agents have merged since. Re-fetch before the PR and before the merge. |
 | "The merge was clean, so the tests still pass" | A clean merge can still be semantically broken. Re-run them. |
 | "This conflict is obviously mine to resolve" | It is someone else's change. Stop and ask unless it carries no meaning. |
+| "The code is right, so I'll update the doc to match" | Only if the change was approved. Otherwise you are erasing evidence that something drifted. |
+| "I'll tidy the docs at the end" | By then nobody remembers why. Reconcile at each boundary. |
+| "Nothing changed this phase" | Say that only after re-reading both sides. |
 | "It mostly works — I'll report success" | Report the gap plainly. A false completion claim costs more than the gap. |
