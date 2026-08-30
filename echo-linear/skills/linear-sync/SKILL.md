@@ -42,9 +42,14 @@ Then reflect critically. Answer each, out loud, before going further:
 - Do the components this work **depends on** actually exist in the repo? Verify. A
   component the work **creates** is expected to be absent — that is not a gap.
 - Create or update — and if update, exactly which project or issue?
-- If linking files: do they exist? Are they committed? Pushed files get a URL; unpushed
-  ones get a repo path — see `references/conventions.md`. Neither is a stop. A file that
-  does not exist is.
+- If linking files: do they exist, and can **someone else** reach them? A pushed file gets a
+  real URL. An unpushed, uncommitted or gitignored file is reachable only on this machine —
+  a teammate opening the issue, or an agent in a fresh checkout, gets a dead path.
+
+**Unreachable sources are a stop.** Say which files are not pushed and ask the user to
+commit and push them before you file anything. Only file with a plain-text path when they
+explicitly say to go ahead without pushing — and say in the confirm table that the link is
+local-only. A file that does not exist is always a stop.
 
 **Any gap → STOP. Ask clarifying questions. Write nothing to Linear.**
 

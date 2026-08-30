@@ -91,25 +91,36 @@ cycle and due date unset.
 
 ## File links
 
-Prefer a GitHub blob URL — but **only if the file is committed and pushed**. Verify with
-git; do not assume.
-
-Otherwise use the repo-relative path (`docs/superpowers/specs/…`), which a local coding
-agent can still open.
+Use a GitHub blob URL — **only if the file is committed and pushed**. Verify with git; do
+not assume. Check `git check-ignore` too: a gitignored file can never be pushed, so it can
+never get a URL.
 
 **Never link a path that does not exist.**
 
-### A repo path cannot be a link attachment
+### An unreachable source is a stop, not a fallback
 
-Link attachments need a URL. A repo-relative path is not one, so an unpushed file goes in
-the description's Context line instead, as plain text:
+Link attachments need a URL. A repo-relative path is not one — and worse, it only resolves
+on the machine that has the file. The issue looks complete and is unusable to everyone else.
+
+**So an unpushed source stops the run.** Name the files, ask the user to commit and push
+them, and wait. Pushing costs one command; a project of issues pointing at nothing costs a
+lot more.
+
+Only after the user explicitly says to proceed without pushing, put the path in the
+description's Context line as plain text:
 
 ```
-**Context** · Spec `docs/superpowers/specs/2026-08-20-content-v2-design.md` §3
+**Context** · Spec `docs/superpowers/specs/2026-08-20-content-v2-design.md` §3 · local only
 ```
 
-This is the **one** sanctioned exception to "no file paths in the prose". Say in the confirm
-table which sources are unpushed, so the user can push them and get real links instead.
+This is the **one** sanctioned exception to "no file paths in the prose", and the confirm
+table must say the link is local-only.
+
+### Where specs live must be committable
+
+If the repo gitignores the directory specs are written to, every issue this skill files will
+hit the stop above. Fix the ignore rule rather than working around it — a spec nobody but
+you can open is not a link.
 
 ## Updates must never clobber hand-written text
 

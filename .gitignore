@@ -1,6 +1,3 @@
-# Internal development docs
-docs/superpowers/
-
 # Local Claude Code settings (may contain machine-specific paths)
 .claude/settings.local.json
 
