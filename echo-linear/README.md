@@ -46,6 +46,19 @@ simple sequential work. Dependencies are set as real Linear blocking relations.
 Updates never rewrite a description. New information is prepended as a dated callout, so
 anything you wrote by hand survives.
 
+**Example prompts**:
+```
+"Put this in Linear"
+"Create the Linear issues for what we just agreed"
+"We've finished the spec — file it in Linear"
+"Add these two issues to the Content Intelligence project"
+"Update ECH-42 — we decided to backfill before sealing"
+"Turn this implementation plan into a Linear project with milestones"
+```
+
+**What happens next**: it reflects on whether the scope is actually agreed, picks a shape,
+then prints a `WILL CREATE` table and waits. Nothing reaches Linear before you say yes.
+
 ---
 
 ### `linear-implement` — Linear into merged code
@@ -104,12 +117,67 @@ data — and the code forces it. If it has to be argued, it is material.
 | Assume the branch stood still | Other agents merge while it works. It re-syncs before the PR and before the merge, and re-runs the tests each time — a clean merge can still be semantically broken. |
 | Resolve someone else's conflict | A collision with another agent's change is a stop, unless the conflict carries no meaning. |
 
+**Example prompts**:
+```
+"Implement the Linear project Content Intelligence v2"
+"Execute the Linear plan for ECH project Content Intelligence v2"
+"Build the issues in <linear project URL>"
+"Start building ECH-41"                    ← resolves to its parent project first
+"Continue implementing Content Intelligence v2"
+"The Phase A PR merged — carry on"
+"Skip ECH-42 and continue with the rest"
+```
+
+**What happens next**: it reads the whole project and the sources it links, then prints a
+`DELIVERY PLAN` and waits. It stops again at every phase boundary, and whenever the code
+shows the approved plan is wrong.
+
+**Name the project.** If you don't, it asks rather than guessing — it will never pick the
+most recent one for you.
+
+### Answering it mid-run
+
+Things it will ask, and what a useful answer looks like:
+
+| It says | You say |
+|---|---|
+| "Start implementation?" | `yes` — or amend the plan first |
+| "Phase A shipped. Start Phase B?" | `yes`, or `hold, I want to look at the PR` |
+| "The plan's approach would overwrite 2,400 rows. Options: (a) backfill first…" | `go with (a)` — it records that as a dated approval on the issue |
+| "PR #12 is open and needs your approval" | merge it, then `it's merged` |
+| "Three failed attempts on ECH-42" | `skip it and carry on`, or `here's what's wrong: …` |
+
 ### Surviving a long run
 
 Progress, decisions and open findings go to `.linear-implement/<slug>.md` — gitignored, kept
 outside the per-phase worktrees. It is a cache, not the record: if it is lost, it rebuilds
 from Linear. A resumed run re-prints its plan and asks again; the gate belongs to the
 session, not the project.
+
+## A full run, end to end
+
+The two skills chain, but they do **not** need the same session. Linear carries everything
+between them — so a plan filed on Monday can be built on Thursday, on a different machine.
+
+```
+Session 1   discuss and agree
+            "put this in Linear"              → project + milestones + issues
+
+Session 2   "implement Content Intelligence v2"
+            → DELIVERY PLAN → yes
+            → Phase A builds, ships as one PR
+            → "Phase A shipped. Start Phase B?"
+
+Session 3   "continue implementing Content Intelligence v2"
+            → notices Phase A is Done, resumes at Phase B
+            → re-prints the plan for what remains → yes
+```
+
+Session 3 re-asks because **the approval belongs to the session, not the project.** Consent
+given three days ago is not consent for what happens now.
+
+If you lose the thread, ask: *"What's the status of the Content Intelligence project?"* — it
+reads Linear and tells you which phase, what's blocking, and what it needs from you.
 
 ## Design
 
