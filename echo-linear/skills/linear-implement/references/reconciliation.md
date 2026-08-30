@@ -4,8 +4,9 @@ Coding agents pivot. Blockers appear, assumptions turn out wrong, an approach ge
 mid-phase. That is normal. What is not acceptable is finishing a project where the spec, the
 plan and the Linear issues describe something nobody built.
 
-**Reconciliation runs twice per milestone** — before the phase starts, and after its PR
-merges — and once more at the close.
+**Reconciliation runs twice per phase** — before it starts, and after its PR merges — and
+once more at the close. A project with no milestones uses the batches confirmed at the step-1
+gate as its phases; it does not skip reconciliation for want of a roadmap.
 
 ```
 before phase ──▶ build ──▶ ship ──▶ after phase ──▶ … ──▶ close
@@ -29,12 +30,21 @@ So every difference you find gets classified before anything is written:
 
 | What you found | What you do |
 |---|---|
-| An approved change the doc has not caught up with | **Record it.** Patch the doc and the Linear record, dated, citing where the approval happened |
-| The doc was vague, the code is now specific | **Record it.** State the behaviour as built, cite the PR |
-| A difference **nobody approved** | **Stop.** This is the material-change gate. Report it, do not update the doc to match |
+| An approved change the doc has not caught up with | **Record it.** Patch the doc and the Linear record, dated, **citing the approval-record comment** |
+| The doc was silent on a detail the code had to settle — a variable name, an error string, a log line | **Record it.** State it as built, cite the PR |
+| The doc was **wrong, incomplete or unsafe** about behaviour, and the code went the other way | **Stop.** Incompleteness about behaviour is the material gate's own trigger, not something to write down |
+| A difference **nobody approved** | **Stop.** Report it; do not update the doc to match |
 | Remaining work whose premise the last phase invalidated | **Stop before starting it.** That is the whole point of the pre-flight |
 
-**If you cannot name where a change was approved, it was not approved.**
+**Row 2 versus row 3 is the line to get right.** If the doc's silence made a *decision* for
+you — about behaviour, an interface, data, or anything a reader would want to have agreed —
+that is an incomplete source, and it stops. Row 2 is only for detail nobody would have
+specified.
+
+**If you cannot name the approval-record comment, the change was not approved.** Not the
+chat, not your memory, not the plan section a previous phase already rewrote — that last one
+is circular, and it is exactly how drift becomes permanent and invisible. A comment on the
+issue, or nothing.
 
 ---
 
@@ -63,13 +73,20 @@ Building against a stale criterion produces work that passes its issue and fails
 
 What shipped is now fact. Make the record match it.
 
+**Classify every difference against the table above first.** Only differences that landed in
+its two *Record it* rows get written; the rest stop. Nothing below is unconditional.
+
 1. **The implementation plan** — update the phase's section to describe what was actually
-   done: the approach taken, anything replaced, anything deferred. Date it.
+   done: the approach taken, anything replaced, anything deferred. Date it, citing the
+   approval-record comment. The plan is an authoritative source, so an unapproved difference
+   never reaches this step — it stopped at the table.
 2. **Each shipped issue** — if what landed differs from what its description said, patch the
    description with an anchored edit and a dated note. Never a rewrite.
 3. **The milestone body** — if its "accepted when" no longer matches what was accepted, fix
-   it. Milestones have no patch operation: read the complete body first, prepend, re-send
-   the whole thing (`linear-updates.md`).
+   it, **and only with an approval you can cite**: a milestone save has no patch operation, so
+   this is a full replace of hand-written text. Read the complete body first, prepend, re-send
+   the whole thing, and send `project` too (`linear-updates.md`). If you cannot reproduce the
+   existing body exactly, stop and ask.
 4. **The spec** — only where an **approved** change altered behaviour. An unapproved
    difference is a stop, not an edit.
 5. **The project description** — only if the goal or what-ships list is now wrong.
@@ -77,6 +94,21 @@ What shipped is now fact. Make the record match it.
    while the reason is fresh. Do not leave it for the agent that picks it up.
 
 Say in the checkpoint report what you reconciled and what you left alone.
+
+### When post-flight finds something unapproved
+
+Awkward by construction: the phase has merged and its issues are `Done`. **Do not revert, do
+not re-open the issues, and do not write the difference into the docs.**
+
+1. Post it as a discrepancy comment on the issue it affects — what shipped, what the approved
+   source says, and that it shipped without approval.
+2. Say it in the checkpoint report, plainly, as an outstanding item.
+3. Leave the doc showing what was **approved**, not what shipped, until the user decides
+   which is right.
+4. Do not start the next phase. Its pre-flight would be reading a record you have just found
+   untrustworthy.
+
+The code is already live; the honest record of that is the point, not a tidy doc.
 
 ---
 
@@ -102,7 +134,8 @@ next person to read it will build on a lie.
 - **Safe updates only.** Anchored patches; never a full description rewrite; read a milestone
   body completely before replacing it. See `linear-updates.md`.
 - **Word caps hold.** A reconciliation note is a dated callout and does not count toward the
-  cap, but at most two stay at the top — fold the oldest into a comment.
+  cap, but at most two stay at the top — fold the oldest into a comment on that same artifact.
+  Milestones take comments too.
 - **Approval before the source changes.** Editing the authoritative spec or plan follows the
   material-change gate, not this file.
 - **Comments carry history, descriptions carry the current truth.** If a description is

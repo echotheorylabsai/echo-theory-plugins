@@ -70,6 +70,30 @@ assumes the column is always populated.
 
 State facts and options. **Never announce a decision, a new plan, or a changed criterion.**
 
+### Approval record
+
+```markdown
+**Approved 2026-08-30** — backfill the 2,400 unsealed rows before sealing forward.
+
+**Asked** — see the discrepancy comment above; three options given.
+**Answer** — option (a), backfill first.
+**Changes** — plan §Phase A.2 gains a backfill step; this issue's criterion 2 is patched.
+```
+
+Post it **before** acting on the approval, on the issue the change affects. Reconciliation
+cites this comment; nothing else counts as provenance.
+
+### Why it has to be here
+
+When the user approves a change — in chat, in a review, anywhere — **write it to the issue as
+a comment before acting on it**, quoting what was approved and dating it. Mirror it in the
+ledger.
+
+Reconciliation later has to distinguish an approved deviation from an unapproved one, and its
+test is whether you can name where approval happened. A chat transcript is not something a
+resumed session can open. If the approval is not in Linear, a later run cannot tell drift
+from agreement.
+
 ## Project status updates
 
 Post one:

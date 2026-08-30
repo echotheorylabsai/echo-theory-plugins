@@ -16,10 +16,10 @@ if the project has no identifier, and record which you used in the header.
   is ignored by the target repo.
 
   If it is not, **make and commit that `.gitignore` edit inside the first phase's worktree**,
-  so it rides along in that phase's PR. Never edit `.gitignore` in the primary checkout: an
-  uncommitted change there makes the next `git pull --ff-only` abort, and never commit it
-  straight to the integration branch — that skips review and fails outright on a protected
-  branch. Mention it in the step-1 plan so an unrelated line in that PR is not a surprise.
+  so it rides along in that phase's PR. Never edit `.gitignore` in the primary checkout: a
+  later `git pull --ff-only` aborts there the moment anyone upstream touches the same file,
+  and it is untracked work nothing will ever carry. Never commit it straight to the
+  integration branch either — that skips review and fails outright on a protected branch. Mention it in the step-1 plan so an unrelated line in that PR is not a surprise.
 
   Until that PR merges, the ledger directory is untracked in the primary checkout. That is
   expected, and it is the only uncommitted thing step 0 tolerates. An untracked directory
@@ -100,7 +100,8 @@ close.
 | A review finding | Under `Findings`, unchecked |
 | A finding resolved | Check it off |
 | A failed verification cycle | Increment `Cycles` |
-| Blocked, or the grind limit hit | `Stopped` — what happened, what is awaited |
+| Blocked, or the grind limit hit | `Stopped` — what happened, what is awaited, and any `WIP (unreviewed)` commit left on the branch |
+| An approval given in chat | Under `Decisions`, verbatim, dated — **and mirrored to a Linear comment**. A transcript is not a citation a later session can open |
 | End of an issue | State `IN REVIEW`, criteria all checked |
 | Each checkpoint | Phase PR number, every issue to `DONE`, retained artifacts, `Carried forward` |
 
@@ -121,8 +122,13 @@ After any interruption — a new session, a context reset, a stopped run:
 6. **Re-print the delivery plan for what remains and wait for a yes.** The gate belongs to
    the session, not to the project — the earlier approval was given to a session that is
    gone.
-7. Then resume at the first issue that is not Done, from step 2, including its pre-flight
-   and its re-read.
+7. Resume at the first issue that is **neither Done nor already finished**. An issue sitting
+   `In Review` with an evidence comment and its commit on the phase branch is finished —
+   **do not re-implement it.** Verify the commit is there, and move on. Only an issue with no
+   evidence comment and no commit is genuinely unstarted.
+8. If the phase branch and worktree still exist, reuse them. Cut a new worktree only when
+   starting a phase that has none.
+9. Then continue from step 2, including the phase's pre-flight and the issue's re-read.
 
 Never resume from the ledger alone. It records what you intended; Linear records what
 happened.

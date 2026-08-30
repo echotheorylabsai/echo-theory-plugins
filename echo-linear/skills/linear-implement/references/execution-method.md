@@ -34,11 +34,15 @@ opposite responses:
 | `Your local changes to <file> would be overwritten` | The primary checkout has uncommitted edits | Find out whose. If they are yours, you put them in the wrong place — move them to a worktree. If they are not, **stop and ask**. Never discard them |
 | `Not possible to fast-forward` / divergent branches | The local branch has commits the remote does not | **Stop and ask** — do not merge, rebase or reset past it |
 
-Branch name: `feat/<phase-slug>`, e.g. `feat/phase-a-instrument`. A project with no
-milestones uses the checkpoint boundaries confirmed at step 1 as its branch boundaries — the
-two are the same thing — and names each branch for the issues it carries:
-`feat/<project-slug>-ech-41-ech-42`, or `feat/<project-slug>-batch-1` when that is unwieldy.
-Put the chosen names in the step-1 plan so they are approved with everything else. Use the repo's own convention if it has one; check recent branches
+**Branch names.** The repo's own convention wins wherever it has one — check recent branches
+and any contributing guide first, and follow what you find. Absent a convention:
+
+- with milestones: `feat/<phase-slug>`, e.g. `feat/phase-a-instrument`
+- without: the checkpoint boundaries confirmed at step 1 are the branch boundaries, and each
+  branch is named for the issues it carries — `feat/<project-slug>-ech-41-ech-42`, or
+  `feat/<project-slug>-batch-1` when that is unwieldy
+
+Either way, put the chosen names in the step-1 plan so they are approved with everything else. Use the repo's own convention if it has one; check recent branches
 and any contributing guide first.
 
 **Commit per issue.** Each issue gets its own commit or commits on the phase branch, with
@@ -80,6 +84,22 @@ a schema, or a default your work depends on, with no conflict marker anywhere.
 
 This is the failure this whole section exists to prevent. Merging on stale green is how two
 correct branches produce a broken integration branch.
+
+### When that re-verification fails
+
+There is no conflict to look at — someone else's merged change broke your work silently.
+**Treat it exactly like a conflict: stop and ask.** Their change is in the integration branch
+and yours is not, so theirs is the one that stands; whether yours adapts, or theirs was
+wrong, is not yours to decide alone.
+
+Report what broke, the commit that broke it, and what each side appears to be doing. The
+grind limit does not apply — it counts attempts at one issue's own criteria, and this failure
+belongs to no issue.
+
+**The one exception:** a purely mechanical adaptation with no behaviour change — a renamed
+import, a moved constant, a signature that gained a defaulted parameter. Make it, re-verify,
+and say in the PR what you adapted and to whose commit. Anything that changes what your code
+*does* is the material gate.
 
 ### A conflict is a stop
 
@@ -188,8 +208,11 @@ criteria, nothing else.
 each issue. Record it in the ledger so a resumed session does not inherit a stale count.
 
 Three failed cycles on one issue is the stop. Commit the work in progress to its branch so
-the evidence survives, record what failed, what you tried and what you believe is wrong,
-then report and ask. Grinding past this burns hours and usually means the issue or the
+the evidence survives — prefix the message `WIP (unreviewed):` and record it in the ledger,
+because it has not been through independent review and must not ride into the phase PR
+unexamined. Record what failed, what you tried and what you believe is wrong, then report and
+ask. Before the phase PR opens, every `WIP (unreviewed)` commit must be finished and reviewed,
+or dropped from the branch. Grinding past this burns hours and usually means the issue or the
 source is wrong.
 
 ## Post-merge cleanup

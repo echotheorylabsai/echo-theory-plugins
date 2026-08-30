@@ -63,8 +63,9 @@ turns out to be wrong:
    first.
 2. **Execute** — the next unblocked issue only, in the current phase's worktree: a failing
    test first, an independent review, its own commit, a truthful Linear state.
-3. **Checkpoint** — the phase ships as one PR, merges, and every issue in it goes Done.
-   Then it stops and waits before the next phase.
+3. **Checkpoint** — the phase ships as one PR. If a human must approve it, it hands you the
+   link and waits. Once merged, every issue in the phase goes Done, the docs are reconciled,
+   and it waits again before the next phase.
 4. **Close** — re-reads everything from Linear, reconciles every doc against the code, runs
    a final whole-project review, and reports the gaps plainly.
 

@@ -44,6 +44,19 @@ approved.
 across issues, or a phase that needs a milestone. Say what is needed and why, then stop. Do
 not improvise around the missing artifact, and do not create it yourself.
 
+**Handing back mid-phase, and coming back.** The current phase keeps its worktree, its branch
+and its `In Review` issues; nothing is cleaned up and nothing is reverted.
+
+- Tell `linear-sync` the source is the **approval-record comment and the discrepancy comment**
+  on the affected issue, not a file. Those are reachable, so its source gate is satisfied —
+  say so, rather than pushing the phase branch to manufacture a URL.
+- Say whether the new issue joins this phase or waits for the next. Joining an in-flight
+  phase means it ships in that PR; if unsure, ask.
+- On return, this is a **resume**: re-read from Linear, add the new issue to the ledger's
+  order table, re-print the delivery plan for what remains, and get a yes. Then continue
+  **within the phase** at the next unfinished issue — do not re-run the phase's pre-flight on
+  work already `In Review`.
+
 ### Source precedence
 
 The **issue** defines the immediate outcome. The **approved sources** define behaviour,
@@ -59,10 +72,18 @@ given an **issue** key, resolve it to its parent project and confirm which proje
 about to execute. **If none was named, ask.** Never guess, never take the most recent
 project.
 
-**Then check for a resume.** Look for a ledger under `.linear-implement/` matching that
-project. If one exists, this run is a resume: follow `references/ledger.md` § Resuming, and
-treat its record as the explanation for any issue already `In Progress` or `Done`. A resume
-still passes through the step-1 gate.
+**Then check for a resume — from Linear, not from disk.** If any issue in the project is
+already `In Progress`, `In Review` or `Done`, **this run is a resume**, whether or not a
+ledger exists locally. A ledger is a convenience; a different machine or a cleared checkout
+has none, and keying off the file would silently start a fresh run over live work.
+
+Follow `references/ledger.md` § Resuming — read the ledger, or rebuild it from Linear when
+there is none. A resume still passes through the step-1 gate.
+
+**Check whether the last completed phase's post-flight ran.** If a phase is `Done` but the
+plan, its issues or its milestone still describe something else, the previous session died
+between the merge and its reconciliation. Run that post-flight now, before touching the next
+phase — its approval records are what this phase's pre-flight has to read.
 
 Read it **whole** from Linear: overview, milestones, every issue, attachments, links,
 comments, relations, dependencies and states.
@@ -76,6 +97,13 @@ so in the delivery plan rather than asserting it is current.
 
 **Determine the integration branch.** The repo's default branch, unless its instructions
 name another. State which you picked. If there is no clear default, ask.
+
+**List the workspace's states.** This plugin runs in workspaces other than the one it was
+written for. The whole per-milestone model rests on there being a state meaning *finished
+but not merged* — `In Review` in the expected workspace. Find the equivalent and name it in
+the delivery plan. If the workspace has no such state, say so and ask which to use; do not
+invent one, and do not fall back to marking issues `Done` before they merge. Full workspace
+notes: `../linear-sync/references/conventions.md`.
 
 Then read the repo: its instructions, **its docs**, the code this work touches, its tests,
 its deployment context.
@@ -98,8 +126,8 @@ Any of these ends step 0. Report it and ask — write nothing.
 - An issue has no acceptance criteria you could actually check.
 - A component the work **depends on** does not exist in the repo. (A component the work
   **creates** is expected to be absent — that is not a stop.)
-- The primary checkout has uncommitted changes other than the ledger and its `.gitignore`
-  entry.
+- The primary checkout has **any** uncommitted change. The untracked ledger directory is the
+  one exception; its `.gitignore` line is edited in a worktree, never here.
 - No Linear project exists for this work — that is `linear-sync`'s job, not yours.
 
 Do not synthesize a plan to fill a gap. A confident wrong execution is worse than a
@@ -115,23 +143,33 @@ DELIVERY PLAN — Content Intelligence v2
 Baseline     docs/superpowers/plans/2026-08-20-content-v2-plan.md @ abc1234 (pushed)
 Integration  main · clean · one worktree, branch and PR per milestone
 
-Phase A · Instrument
+Phase A · Instrument            branch feat/phase-a-instrument
   ECH-41  [Phase A.1] Record the baseline    Backlog
   ECH-42  [Phase A.2] Seal Day 0             Backlog  ← blocked by ECH-41
-Phase B · Report
+Phase B · Report                branch feat/phase-b-report
   ECH-43  [Phase B.1] Change log             Backlog  ← blocked by ECH-42
 
 Checkpoints  after Phase A · after Phase B
 Gates        PR review — say who merges
+Also in PR   one .gitignore line for .linear-implement/  (Phase A)
 Risks        ECH-42 touches the production data export
 
 Start implementation?
 ```
 
+**Everything that will be written appears here.** Branch names, the checkpoint boundaries,
+who merges, and any incidental change riding in a PR — such as the ledger's `.gitignore`
+line. Nothing is written that this table did not show.
+
 **Checkpoint boundaries are the project's milestones.** A project with no milestones
 proposes boundaries **of size, not of phase** — every second issue, or every issue for
-risky work — and has them confirmed here. That is a run-length decision, not an invented
-roadmap; nothing is written to Linear.
+risky work — and has them confirmed here, along with a branch name for each. That is a
+run-length decision, not an invented roadmap; nothing is written to Linear.
+
+```
+Batch 1  ECH-41, ECH-42        branch feat/content-v2-batch-1
+Batch 2  ECH-43, ECH-44        branch feat/content-v2-batch-2
+```
 
 **Name who merges.** If PRs need human approval, say so in the plan — it changes the flow at
 the checkpoint.
@@ -145,6 +183,10 @@ project status update — goal, order, dependencies, material risks or gates, ne
 issue. Not a restatement of the plan.
 
 ## 2. Execute a phase
+
+**"Phase" means a milestone, or — in a project with none — one of the batches confirmed at
+the step-1 gate.** Everything below applies to both: the worktree, the pre-flight, the
+post-flight, the PR, and the rule that an in-phase blocker is satisfied at `In Review`.
 
 ### Pre-flight — before the first issue of every phase
 
@@ -241,8 +283,14 @@ issue.
 
 | | What happens |
 |---|---|
-| **Material** | Get explicit approval first. Then update the authoritative source, then the affected Linear records under the safe-update rules. |
-| **Non-material** | Update the implementation plan before coding. Then patch every affected issue with an anchored patch, attach the current source link if needed, comment explaining the change. Re-read the changed sources and records before resuming. |
+| **Material** | Get explicit approval. **Then post an approval-record comment on the issue** — quoting what was approved, dated — *before* acting on it. Then update the authoritative source, then the affected Linear records under the safe-update rules. |
+| **Non-material** | Post the same record comment, saying what the code forced and why it meets all five conditions. Update the implementation plan before coding. Then patch every affected issue with an anchored patch, attach the current source link if needed. Re-read the changed sources and records before resuming. |
+
+**The approval-record comment is not optional, and it is not paperwork.** Reconciliation
+later has to tell an approved deviation from an unapproved one, and its only test is whether
+you can name where approval happened. Approval given in chat dies with the session. If it is
+not in Linear, the next run cannot distinguish agreement from drift — and the plan you
+rewrote afterwards is circular evidence for itself. Template: `linear-updates.md`.
 
 A specification change that alters requirements or behaviour is **always** material.
 
@@ -258,11 +306,24 @@ Every issue in the phase is committed and `In Review`. Now the phase lands:
    link and "tell me when it has merged, or what to change." Do not start the next phase;
    its worktree would be cut from a branch that does not contain this one.
 
-   **Re-entry.** When the user says it merged, resume at step 4 — do not restart the phase
-   and do not re-run pre-flight. If they bring back **review feedback** instead: apply it on
-   the phase branch, re-verify, push, and return here. Feedback that changes behaviour,
-   acceptance criteria or scope is a **material change** — take it through that gate before
-   implementing it, even though a human asked for it.
+   **When they say it merged:** skip item 4 entirely — the merge has happened, so there is
+   nothing to re-sync before it. **Confirm from the remote** that it landed on the intended
+   integration branch (by content, under a squash or rebase), then continue at item 5. Do not
+   re-run pre-flight and do not restart the phase.
+
+   **When they bring back review feedback:** apply it on the phase branch, re-verify, re-run
+   the independent review for each issue the change touches, push, and return to **item 3** —
+   the PR already exists; never open a second one. Name the issue in each commit; if the
+   change spans two issues, split the commits.
+
+   Feedback that changes behaviour, acceptance criteria or scope is a **material change** —
+   take it through that gate first, even though a human asked for it. In this post-PR state
+   the gate's "leave the issue `In Progress`" does not apply: the work is committed and
+   reviewed, so issues **stay `In Review`** while the decision is pending.
+
+   **If you cannot merge at all** — no PR tooling, or a branch you may never merge — this is
+   an unsatisfied external gate, not a failure. Say so, leave the issues `In Review`, and stop
+   at this checkpoint. Do not close the project behind it (step 4).
 4. **Re-sync again before merging** — it can move between opening and merging. Once merged,
    **confirm from the remote** that it landed on the intended integration branch. Under a
    squash or rebase merge, confirm by content, not commit ancestry.
@@ -296,7 +357,8 @@ acceptance criteria; that required verification and independent reviews passed; 
 every external gate is satisfied or explicitly accepted as a separate follow-up.
 
 Then run the final relevant repository verification and **one final independent
-whole-project review**. Fix and re-review material findings before claiming anything.
+whole-project review**. Fix and re-review **significant** findings before claiming anything —
+"significant" means worth fixing before shipping, not the material-change gate.
 
 Report: verified results, external assumptions, completed issues, remaining gates, gaps —
 and state plainly **either** that every document and Linear record describes what was built,
@@ -305,8 +367,10 @@ naming the commit or PR you checked against, **or** exactly which ones do not an
 **A project that ships correct code and leaves a misleading spec has failed a required
 outcome.** The next person to read it builds on the lie.
 
-**Never mark the project Done while a required outcome sits behind an unsatisfied external
-gate**, unless the approved workflow explicitly reclassified it as a separate follow-up.
+**Setting the project's own state is the user's call, not yours.** At the close, report that
+every outcome is met and **ask** whether to mark the project complete. Never set it while a
+required outcome sits behind an unsatisfied external gate, even if asked — say what the gate
+is instead.
 
 ---
 

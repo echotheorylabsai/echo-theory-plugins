@@ -33,7 +33,11 @@ independence — it is a broken review.
 | **The plan table the user confirmed at step 3** | Recovery — it is the only statement of what should exist |
 | **A verbatim copy of any description or milestone body that existed before this run** | Check 7 — there is nothing to compare against otherwise |
 
-Give it those and nothing else. Never the writer's reasoning about why a choice was made.
+It also needs **read access to the repo and to git** — checks 5 and 6 ask whether a file was
+pushed and whether a component exists, and neither is answerable from Linear.
+
+What it must never be given is **the writer's reasoning** about why a choice was made. That is
+what "clean context" protects.
 
 ### The reviewer is read-only. Always.
 

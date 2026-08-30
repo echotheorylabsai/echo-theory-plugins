@@ -178,7 +178,8 @@ workspace.
 
 1. `get` the milestone and read its **complete** current description.
 2. Build the new body: your dated callout, a blank line, then **the existing body verbatim**.
-3. Save that whole string as `description`.
+3. Save that whole string as `description` — **and send `project` too.** It is required even
+   on an update, and omitting it fails validation.
 
 You are reproducing by hand what `patch` does for issues. There is no shortcut.
 
@@ -202,15 +203,16 @@ a changelog long before it degrades into a long one.
 - When adding a third, move the **oldest** one into a Linear comment on that issue, then
   delete it from the description with an anchored `replace`.
 - The description stays a description. The comment thread carries the history.
-- **A milestone has no comment thread.** At a third callout on a milestone, fold the oldest
-  into a comment on the project instead, and say you did.
+- At a third callout on a milestone, fold the oldest into a **comment on that milestone** and
+  say you did. Milestone comments exist — they render as description comments — so history
+  stays with the artifact it belongs to.
 
 ### Traps
 
 | Field | Behaviour |
 |---|---|
 | `labels` | **Replaces the entire set.** `get` the issue and read its current labels *before* writing any, then send the full intended set — otherwise existing labels are silently dropped. |
-| `links`, `blocks`, `blockedBy`, `relatedTo` | Append-only. Safe to add to. |
+| `links`, `blocks`, `blockedBy`, `relatedTo` | Adding is safe — these do not replace the set. Removing needs the explicit remove operation, so a wrong dependency **can** be corrected; it just is not undone by omitting it. |
 | `patch` | Each anchor must match **exactly once**. One failing op aborts the whole save — nothing changes, which is safe but silent. |
 | `patch` anchors | Must match what Linear **stored**, not what you sent. Its parser rewrites markdown on save. **Always `get` the issue first and copy the anchor from the stored text.** |
 | `save_milestone` | **No `patch` support.** `description` replaces the whole body. Read the existing body first and re-send it, or it is gone. |

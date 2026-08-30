@@ -65,7 +65,7 @@ reached in chat counts as its source; a written spec is better, not required.
 
 | Tier | The work is | Creates | Titles |
 |---|---|---|---|
-| 1 | Additions to a project that **already exists** — whatever the source | Issues only, on that project | continue the project's existing convention |
+| 1 | Additions to a project that **already exists** — whatever the source | Issues on that project, plus a milestone only if the addition is a genuinely new phase | continue the project's existing convention |
 | 2 | A new body of work with **no phases** | New project + flat issues | simple — `1. Title` |
 | 3 | A new body of work **organised into phases** | New project + milestones from phases + issues | complex — `[Phase A.1] Title` |
 
@@ -116,9 +116,16 @@ WILL UPDATE
 Proceed?
 ```
 
-Blocking relations, target dates, and whether the source links are real URLs or local-only
-paths all go in the table. They are what step 5 checks and the only record of what was
-approved — anything absent here cannot be recovered later.
+**Everything step 5 audits must appear here**, because this table is the only record of what
+was approved and the only thing a partial-failure recovery has to work from:
+
+- team, project and milestone each issue lands on
+- the exact labels, and the state
+- blocking relations
+- target dates, or `none set`
+- whether each source link is a real URL or local-only
+
+Anything absent here cannot be checked, and cannot be recovered later.
 
 If they amend, re-print and wait again.
 
