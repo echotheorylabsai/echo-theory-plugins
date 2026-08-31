@@ -618,5 +618,48 @@ The reviewer's list of what would surprise someone, all true and all now disclos
 guarded by two independent rules; every traced path either completes or stops with a stated
 reason and a next action.
 
-**Still untested:** trigger matching, workspace fallbacks, context-loss resume, the
-material-change approval path end to end, and Codex.
+**Still untested at ship time:** trigger matching, workspace fallbacks, context-loss resume,
+the material-change approval path end to end, and Codex.
+
+---
+
+## Codex verification — two of those gaps now closed
+
+Run against a live `codex exec` session (CLI 0.149.1, `gpt-5.6-luna`) after installing 1.2.0.
+
+**O-42 — Codex loads both skills.** A fresh session lists them among its 46 skills:
+
+```
+echo-linear:linear-implement
+echo-linear:linear-sync
+```
+
+Installed with `codex plugin marketplace upgrade echo-theory-plugins` then `codex plugin add
+echo-linear@echo-theory-plugins`. The `[[skills.config]]` entries are **not** required — that is
+the older mechanism. Evidence: `echo-marketing`'s entries point at
+`…/echo-marketing/1.0.0/skills/…`, **a directory that no longer exists**, while `echo-linear`
+loads correctly with no entries at all. `echo-marketing` is the one that needs reinstalling.
+
+The Linear MCP is configured in Codex (`[mcp_servers.linear]`), so the dependency both skills
+declare is satisfied.
+
+**O-43 — trigger matching works, and disambiguates.** This was the largest gap at ship time:
+the whole live run loaded skills by file path, so descriptions were never exercised. Tested
+directly, with no skill named in the prompt:
+
+| Prompt | Selected |
+|---|---|
+| *"We've agreed on the budget guard work — put this in Linear"* | `linear-sync` ✅ |
+| *"Implement the Linear project zz-Per-Run Budget Guard"* | `linear-implement` ✅ |
+| *"Update the Linear project with what we just decided"* | `linear-sync` ✅ |
+| *"Continue implementing zz-Per-Run Budget Guard"* | `linear-implement` ✅ |
+
+The third is the one a review round flagged as genuinely ambiguous between the pair — updating
+Linear to match shipped code is `linear-implement`'s post-flight, while "update the Linear
+project" is a literal `linear-sync` trigger. It resolved correctly. Its stated reasoning on the
+first: *"because it creates or updates the agreed work as Linear projects, milestones, or
+issues"* — reading the description, not guessing from the name.
+
+**Still untested:** workspace discovery fallbacks, context-loss resume, and the material-change
+approval path end to end. All three need a run whose conditions this environment does not
+produce on demand.
