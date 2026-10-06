@@ -15,6 +15,21 @@
       "name": "echo-linear",
       "source": "./echo-linear",
       "description": "Turn approved specs, PRDs and implementation plans into Linear projects, milestones and issues written in product language — then deliver them, issue by issue, test-first, with an adversarial review before anything is reported as done."
+    },
+    {
+      "name": "blast-radius",
+      "source": "./echotheory-mods/blast-radius",
+      "description": "Claude Code mod: holds risky shell commands (rm -rf, git reset --hard, git clean, force push, migrations) and shows what they would change, with Proceed and Cancel buttons."
+    },
+    {
+      "name": "token-weather",
+      "source": "./echotheory-mods/token-weather",
+      "description": "Claude Code mod: a live forecast of the context window above the prompt — a weather icon, the fill percentage, and a chart of the last turns."
+    },
+    {
+      "name": "replay-theater",
+      "source": "./echotheory-mods/replay-theater",
+      "description": "Claude Code mod: step through the file edits Claude made in the last turn, one diff at a time."
     }
   ]
 }
