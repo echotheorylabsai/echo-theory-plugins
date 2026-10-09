@@ -1,6 +1,6 @@
 # Lean Harness v0 — Product Spec
 
-Status: draft for review · 2026-10-08 · owner: the user (sole developer).
+Status: approved 2026-10-08 (Fable review: APPROVE) · owner: the user (sole developer).
 Parent design (approved): [`docs/lean-coding-harness-v0-design.md`](../../lean-coding-harness-v0-design.md),
 also the Claude Doc at https://claude.ai/code/artifact/641331bd-9fc6-4211-8045-9f1c4ee6a467.
 This spec is the build contract for v0. Where it and the parent differ, this spec wins, and every
@@ -122,7 +122,7 @@ clean up (§4.6).
 ├─ ~/.codex/hooks.json                  6 hook entries (you approve them once in Codex)
 └─ ~/.codex/config.toml                 state dir added to [sandbox_workspace_write].writable_roots
 
-~/Desktop/src/echo-official/lean-harness/     harness repo: CODE ONLY (private, echo-official org)
+~/Desktop/src/echo-official/lean-harness/     harness repo: CODE ONLY (private, GitHub org echotheorylabsai)
 
 <project>/ (each project, installed once by `harness install`, merged via PR)
 ├─ .gitattributes                       .harness/memory/*.md merge=union
@@ -596,7 +596,7 @@ next starts.
 
 | Stage | Adds | Records | Exit criteria |
 |---|---|---|---|
-| **Phase 0** (short) | `install --user` dry run on a throwaway repo; confirm Claude desktop and Codex app sessions run the user-level hooks; confirm `git hash-object -t tree` runs inside a sandboxed `codex exec` | — | Each item confirmed, or its fallback chosen and written into this spec |
+| **Phase 0** (short) | Capture hook-payload fixtures from both agents in a throwaway repo; `install --user` dry run there; confirm Claude desktop and Codex app sessions run the user-level hooks; confirm `git hash-object -t tree` runs inside a sandboxed `codex exec` | — | Each item confirmed, or its fallback chosen and written into this spec |
 | **Slice 1: one measured task (Claude)** | Spool, event schema v1, Claude adapter, `install`, `doctor` (A–E, Claude), `start`, `phase`, `check`, `rebase` (no memory cleanup), `pr`, `pr --refresh`, `close`, `score` (resolution, gate, timing, agent time, coverage); phase files triage, research, resolve, plan, build, verify; `AGENTS.md` | Every raw input in §6.12 except `tier`, `defect` and harness memory events | One real mvp M task merged with a complete scorecard (all boundaries present, gate evaluated, no unexplained orphans); two tasks in parallel in mvp scored correctly |
 | **Slice 2: both agents, all phases (ready for real work)** | Codex adapter and install (hooks, approval step, writable root, bootstrap); retro phase, `retro-bundle`, harness memory, `memory`, `rebase` by-id cleanup; `tier`, `review`, `defect`; transcript cache | Everything in §6.12 | Claude and Codex tasks running concurrently in mvp; at least one echo-wiki task; a Claude task whose verify ran in a Codex delegate, with the delegate's check recorded; two parallel tasks' lessons merged cleanly; scorecards complete for all |
 | **Slice 3: full scorecard** | All seven metrics, tokens and dollars, topology rebuild, summary with spread per tier, note-line validation | — | Scorecards recomputed for every task since Slice 1; three tasks hand-checked against the scorer |
@@ -618,8 +618,10 @@ spans and memory events; they prove the instrumentation and stay outside any v1 
   under parallel appends; fetch retry under concurrent fetches; union merge plus by-id cleanup across
   two branches; `rebase` conflict stop and rerun; `pr` and `pr --refresh` against a local bare remote
   with a stubbed `gh`; gate across merge, squash and rebase merges.
-- **Adapter contract:** recorded Claude and Codex hook payloads (captured on 2026-10-08) as fixtures;
-  a changed payload must produce a `format_warning`, never a crash.
+- **Adapter contract:** real Claude and Codex hook payloads, captured in Phase 0 from throwaway
+  sessions (the 2026-10-08 captures were not kept; §16 lists their fields), stored as fixtures; a changed
+  payload must produce a `format_warning`, never a crash. Remove the trust entries `codex exec` adds for
+  throwaway folders afterwards (§16).
 - **End-to-end smoke:** one scripted task in a throwaway repo driven by real `claude -p` and
   `codex exec` (with `< /dev/null`), scored, with the scorecard compared to expected values.
 - `harness doctor` doubles as the installation test on each machine.
