@@ -1,6 +1,6 @@
 # Lean Harness v0 — Product Spec
 
-Status: approved 2026-10-08 (Fable review: APPROVE) · owner: the user (sole developer).
+Status: approved 2026-10-08 (Fable review: APPROVE); amended 2026-10-09 by the v0 hardening plan (H1–H12 in §2.2) · owner: the user (sole developer).
 Parent design (approved): [`docs/lean-coding-harness-v0-design.md`](../../lean-coding-harness-v0-design.md),
 also the Claude Doc at https://claude.ai/code/artifact/641331bd-9fc6-4211-8045-9f1c4ee6a467.
 This spec is the build contract for v0. Where it and the parent differ, this spec wins, and every
@@ -75,6 +75,18 @@ Type: **O** = override, **A** = added, **D** = deferred to v1 or later.
 | C13 | Randomization, pinned version checkouts, `shared_commit` dispatch, memory snapshot per comparison, the decision record and statistical test | Deferred to v1; v0 assigns every task to the baseline and runs from the harness repo's own checkout | D | A comparison only uses tasks randomized against its challenger, so nothing is lost |
 | C14 | (parent silent on cloud) | Local only; commands refuse in detected cloud sessions | D | User decision |
 | C15 | Hooks record "any model value the hook delivers" | Plus `transcript_path` and helpers' `agent_transcript_path` on every event | A | Reconstruction and replay in retro (§5.4) |
+| H1 | (parent: `Check: C3` names one check) | A Decision's `Check:` may list several ids (`Check: C6, C7`); each id must be whole | A | Gap #35: prereqs-table's Decision named C6, C7 and the gate read only C6 |
+| H2 | `state.json` records the phase | The open phase and controlling session come from the task's phase events; `state.json` holds `task_id`, `branch`, `created_at`; `harness start` prints the phase | O | Gap #26: an agent hand-edited `state.json` and `phase`/`pr` trusted it |
+| H3 | Only `ready`, handoff exits and abandons pause the clock | The controlling session's end also pauses it until the task's next `harness` command | A | Gap #40: M1's wall clock ran 2 h with no harness-driven agent |
+| H4 | (none) | `project.json` `merge`: `user` (default) or `agent`; `harness pr` prints the rule at `ready`; never auto-merge | A | User decision: agents may merge when mandated (cloud); clash P1 |
+| H5 | `harness pr` needs every check passing | Runnable checks gate opening the PR; observational checks gate `ready`; after a handoff exit, `check`/`pr` wait for a phase enter | O | Gap #41: E2's "CI passes on this PR" could not be recorded first |
+| H6 | PR title from the Goal line | `harness pr --title` (default: the Goal line, cut at a word) | A | Clash P2/W3: titles broke mvp's commit convention on `main` |
+| H7 | Both `harness pr` pushes run the pre-push hook | The follow-up push, harness bookkeeping only, skips it | O | Gap #2: mvp preflight ran twice per `pr` |
+| H8 | Notes stamped with date and time | Date only; the event log holds exact times | O | Gap #24: note times were made up in 6 of 6 tasks |
+| H9 | Prompt → last stop before the next prompt | A prompt before any stop closes the open span there; all spans cut at the clock's stop | O | Gaps #43, #15: M3 lost its triage agent time |
+| H10 | (none) | Phase commands refuse a `plan.md` without a goal or usable checks; fenced lines are command text | A | Gaps #28, #17 |
+| H11 | S plans hold five sections | S plans may add `## Decisions` | A | Gaps #7, #31 |
+| H12 | Attempts before the last `ready` by timestamp | CLI events take their timestamp under the spool lock; the gate counts attempts before the last `ready` in log order | O | Round-2 plan review: a check stamped before the lock could land after `ready` |
 
 ### 2.3 Deferred
 
@@ -99,7 +111,7 @@ clean up (§4.6).
 |---|---|
 | **Task** | The unit of measurement: one task id (`<date>-<slug>`), one branch, one worktree, one folder `.harness/runs/<task-id>/`. The parent calls this a "run"; this spec keeps the parent's file and command names |
 | **Session** | One agent sitting (a Claude or Codex session, or a delegated process). A task has any number, in sequence or in parallel |
-| **Controlling session** | The main session that issues `harness phase`, `review` and `pr` for the task (recorded in `state.json`) |
+| **Controlling session** | The main session that issues `harness phase`, `review` and `pr` for the task (the session of the latest phase enter, or of the latest `harness start` in the task, from the event log) |
 | **Delegate** | A process launched by another agent's session (§6.9); it may run `harness check` only |
 | **Done** | The task passes the done gate (§6.11). A session ending, stopping or hitting a blocker never completes or fails a task; only the gate, an abandon, or the deadline/expiry does |
 | **Integration branch** | The project's default branch on the integration remote (`origin/main` for both pilots) |
@@ -173,13 +185,14 @@ You, in a terminal:
 Launch an agent IN THAT WORKTREE: claude / codex CLI, or open the folder in either app.
 Codex must be launched with full access (`-s danger-full-access`, or the app's full-access setting).
   3. Bootstrap: the agent runs `harness start`
-       → resolves the task by branch, runs doctor (session probe, install probes, not-cloud probe), appends `resume`, prints the checkout
+       → resolves the task by branch, runs doctor (session probe, install probes, not-cloud probe), appends `resume`, prints the task's phase (H2) and the checkout
   4. The agent reads AGENTS.md from that checkout → `harness phase triage enter` → … → `harness pr`
 ```
 
 - **Bootstrap** (`hooks/bootstrap.md`, fixed): "If another agent launched you, ignore this file and
   follow your prompt. Otherwise run `harness start`, then read `AGENTS.md` from the checkout it
-  prints." Tested: Claude and Codex both ran a "run this first" instruction before the user's request.
+  prints. If `harness start` fails or is refused in a repository that has `.harness/project.json`, stop
+  and tell the user: never work on a harness task without it." (The stop rule: gap #27.) Tested: Claude and Codex both ran a "run this first" instruction before the user's request.
 - **Silence outside harness work:** `harness start` exits silently (no output, exit 0) in a repo
   without `.harness/project.json` or on a branch with no task. Hook handlers exit silently only in a
   repo without `.harness/project.json`; in a harness project they always append (any branch,
@@ -203,8 +216,10 @@ Agent session (Claude or Codex)
 
 The harness owns the workflow and its records: phases, plan, checks, notes, harness memory, PR via
 `harness pr`, timing. The project owns how to build, test, push and clean up: acceptance checks call
-project commands; `harness pr`'s push still triggers the project's pre-push hook (mvp runs
-`npm run preflight`), and that time is charged to the task because it is real; project rules such as
+project commands; `harness pr`'s first push triggers the project's pre-push hook (mvp runs
+`npm run preflight`), and that time is charged to the task because it is real; its follow-up push adds
+only harness bookkeeping in `.harness/` on the same code tree and skips the hook (H7); the agent writes
+the PR title in the project's commit style (`--title`, H6); project rules such as
 mvp's start gate, Graft and reap stay in force.
 
 ### 4.7 Local only (R2)
@@ -243,12 +258,13 @@ None says how to organize agents.
 | **Research** (M, L) | Code and harness memory → `research.md` | `phase research enter/exit`; `harness memory kept\|fixed\|deleted <area>:<id>` for each lesson checked against its cited code | The areas the task touches are mapped |
 | **Resolve unknowns** (L) | Open unknowns → resolved facts or logged defaults | `phase resolve enter/exit` | Every fact is explored or spiked; every preference has a logged default |
 | **Plan** (M, L) | Research → milestones, acceptance checks, decisions, unknowns in `plan.md` | `phase plan enter/exit`; `harness review start\|end` around an optional human review | The plan is a self-contained contract; no code transcripts |
-| **Build loop** (all) | Plan → code, one milestone at a time | `phase build enter` (the first entry snapshots `plan.approved.md`); `harness check <C-id>` after every attempt at a milestone's checks; `harness tier` on found complexity; at the end `harness rebase`, then the final checks (S: `harness check --all` here) | All milestones' checks pass after the rebase |
-| **Verify** (M, L) | The running system → pass or fail per check | `phase verify enter/exit`; `harness check --all`; `harness check <C-id> --observed pass\|fail` for observational checks | Every final check passes; a failure returns to build |
+| **Build loop** (all) | Plan → code, one milestone at a time | `phase build enter` (the first entry snapshots `plan.approved.md`); `harness check <C-id>` after every attempt at a milestone's checks; `harness tier` on found complexity; at the end `harness rebase`, then the final checks (S: `harness check --all` here) | All milestones' checks pass after the rebase, except checks that need the open PR (H5) |
+| **Verify** (M, L) | The running system → pass or fail per check | `phase verify enter/exit`; `harness check --all`; `harness check <C-id> --observed pass\|fail` for observational checks | Every check that can pass before the PR passes; a failure returns to build; checks that need the open PR are recorded after `harness pr` opens it (H5) |
 | **Retro** (M, L; S after a failed check or friction) | `harness retro-bundle` output → up to 3 lessons in `.harness/memory/<area>.md` | `phase retro enter`, `harness retro-bundle`, `phase retro exit` | Lessons written under the admission bar (§5.6), or none qualify |
-| **PR** | Passing checks → an open PR and `ready` | `harness pr <task-id>` | `ready` emitted |
+| **PR** | Runnable checks pass → an open PR; every check passes, observational ones included → `ready` | `harness pr [<task-id>] [--title T]` | `ready` emitted (until then the PR body says it is not ready) (H5) |
 
-After `ready`: any edit, rebase or check starts with `harness phase build enter`; `harness pr`
+After `ready`: any edit, rebase or check starts with `harness phase build enter`; after a handoff exit,
+with the enter of the phase the successor continues in (`check` and `pr` refuse until then, H5); `harness pr`
 re-emits `ready` without opening a second PR. Before merging, you run `harness pr --refresh
 <task-id>`. After merging: `harness close <task-id> --done` when the CLI flagged a scope reduction;
 `harness defect <task-id> "<one line>"` for bugs found later (`--resolved <id>` to close one);
@@ -280,9 +296,10 @@ re-emits `ready` without opening a second PR. Before merging, you run `harness p
 
 ### 5.5 Notes
 
-From the parent, unchanged: one stamped line per entry, under 25 words, written as it happens.
-Template: `<date time> · <agent/model> · <phase> — <what>. [Why: <why>] [Check: C3] [Cites: path:line] [id: a7f3k2]`.
-Why is required on Decisions; `Check:` on a Decision that changes a check or the goal; `id` on
+From the parent, changed by H8: one dated line per entry, under 25 words, written as it happens; the
+event log holds exact times. Template: `<date> · <agent/model> · <phase> — <what>. [Why: <why>] [Check: C3] [Cites: path:line] [id: a7f3k2]`.
+Why is required on Decisions; `Check:` on a Decision that changes a check or the goal, listing every id
+it changes (`Check: C6, C7`, H1); `id` on
 Lessons. Decisions, Unknowns and Friction live in `plan.md`; Lessons in `.harness/memory/`. One
 implementation-note line per milestone when it closes. `harness score` lists malformed lines; it
 never blocks.
@@ -317,7 +334,7 @@ From the parent, unchanged: numbered C1, C2, … in `plan.md`; each has what, ex
 fenced command run from the project root whose exit status is the result. The check-text hash covers
 the whole entry. Observational checks say so and are recorded with `--observed`. In S every check must
 be runnable (a check that can only be observed makes the task M). A re-plan may change a check only
-with a Decision naming it (`Check: C3`, or `Check: goal`).
+with a Decision naming it (`Check: C3`, `Check: C6, C7`, or `Check: goal`).
 
 ---
 
@@ -330,7 +347,7 @@ with a Decision naming it (`Check: C3`, or `Check: goal`).
 | `.harness/project.json` | `harness install` | Once; changed only by a reviewed PR |
 | `.harness/memory/MEMORY.md`, `<area>.md` | Retro writer; at-use fixes; sweep | Retro; during research/build; at reviews |
 | `runs/<task-id>/request.md` | `start --new` | Once, verbatim; its SHA-256 recorded in `start` |
-| `runs/<task-id>/state.json` | `start --new`; `harness phase` | Start; every phase enter/exit |
+| `runs/<task-id>/state.json` | `start --new` | Start (H2) |
 | `runs/<task-id>/config.json` | Triage; `harness tier` | Triage exit; each tier change |
 | `runs/<task-id>/research.md` | Research | M, L |
 | `runs/<task-id>/plan.md` | Every phase (notes); triage, plan, build | Throughout |
@@ -350,6 +367,7 @@ with a Decision naming it (`Check: C3`, or `Check: goal`).
 | `target_benchmark_tier`, `n`, `alpha`, `min_gain` | `"M"`, 10, 0.05, 0.20 | Reserved for v1; recorded now |
 | `baseline_commit` | harness repo HEAD at install | Reserved for v1 (each `start` records the commit that actually ran as `assigned_commit`) |
 | `challenger_commit`, `shared_commit`, `memory_snapshot_commit` | `null` | Reserved for v1 |
+| `merge` | `"user"` | Who merges after `ready`: `user`, or `agent` (after `pr --refresh`, with `gh pr merge --match-head-commit`; not with a merge queue); printed by `harness pr`; never auto-merge (H4) |
 
 ### 6.3 `config.json`
 
@@ -360,12 +378,13 @@ with a Decision naming it (`Check: C3`, or `Check: goal`).
 
 ### 6.4 `state.json`
 
-`task_id`, `branch`, `phase`, `phase_open` (bool), `controlling_session` (nullable), `created_at`.
+`task_id`, `branch`, `created_at`. The open phase comes from the task's phase events, and `harness start`
+prints it; nothing reads a phase from `state.json` (H2).
 
 ### 6.5 `plan.md`
 
 Sections in order: Goal · Outcome · Acceptance checks · Tier · Source · Milestones (each with its
-checks and implementation notes) · Decisions · Unknowns · Friction. S plans hold only the first five.
+checks and implementation notes) · Decisions · Unknowns · Friction. S plans hold the first five, plus `## Decisions` when one is logged (H11).
 
 ### 6.6 State directory (per machine, never in git)
 
@@ -458,12 +477,19 @@ From the parent, unchanged: **wall time** runs from `start` to the first `ready`
 PR revision, from its start (the `resume` of the session that re-enters build, or that `build enter`
 when none precedes it) to its re-emitted `ready` (or a `--refresh` `build exit` without `ready`).
 Excluded as human wait: gaps from a `ready` (or such an exit) to the next revision's start, and from a
-`--handoff` phase exit to the successor's `resume`. The optional plan-review span is charged and
+`--handoff` phase exit to the successor's `resume`. The controlling session's end (§3) also pauses the
+clock, and the task's next `harness` command restarts it: no harness-driven agent works in between.
+Work by a session that never runs a `harness` command is not charged. A session waiting for your reply
+stays alive and stays charged; an adapter without a session-end event keeps the clock running; a second
+session that runs `harness start` while the controller still works takes over as controller (H3). The
+optional plan-review span is charged and
 reported separately. Startup from `start` or a revision/handoff `resume` to the next phase enter is
 charged. A missing boundary makes the task's timing incomplete. Time an agent spends waiting for your
 reply inside a phase is charged. **Agent time** sums, per session, spans from a prompt to the last stop
-before the next prompt or session end (self-started turns also fire prompt events), plus helper start
-to stop. Both are reported per phase. A stopped session that is continued keeps its id; a new session
+before the next prompt or session end (self-started turns also fire prompt events; a prompt that arrives
+before any stop, such as a queued message delivered mid-turn, closes the open span at that prompt), plus
+helper start to stop, cut at the clock's stop; nothing that starts after the stop counts, not even as
+unknown (H9). Both are reported per phase. A stopped session that is continued keeps its id; a new session
 for the task resolves to the same task by branch.
 
 ### 6.11 Done gate
@@ -471,7 +497,8 @@ for the task resolves to the same task by branch.
 From the parent, unchanged: a task is done only when the final `plan.md` checks pass, every check
 added, dropped or rewritten since `plan.approved.md` is named by a Decision, you merged it, and any
 flagged scope reduction was confirmed with `close --done`. Passing means: for every final check, the
-latest completed attempt before the last `ready` passed at a code tree (the commit's tree with
+latest attempt logged before the last `ready` (CLI events take their timestamp under the spool lock, so
+log order is time order, H12) passed at a code tree (the commit's tree with
 `.harness/` removed) equal to the code tree of the `ready` tip, which equals the code tree of the merge
 commit (the last first-parent commit on the integration branch that changed `.harness/runs/<task-id>/`),
 whatever the merge method. A check with no event counts as failed. `harness check` computes code trees
@@ -507,11 +534,11 @@ retroactively for every task recorded since its raw data started.
 | `doctor` | Anyone | Install, pre-start and session probes (§8), read-only | — | 1 (Codex checks 2) |
 | `start --new <slug> --benchmark-tier T --request F` | You | §4.4 step 2; holds the spool lock across uniqueness check, assignment and `start` | An install or pre-start probe fails | 1 |
 | `start` | Bootstrap | Resolve task, install probes, not-cloud probe, session probe, `resume`, print checkout | (silent no-op outside a task; delegates: prints delegate notice) | 1 |
-| `phase <name> enter\|exit [--handoff]` | Controlling session (you for manual build enter) | `state.json` + phase event; first `build enter` snapshots `plan.approved.md` | Default branch; delegate; triage without a passing session probe | 1 |
-| `check [--task ID] <C-id>\|--all [--observed pass\|fail]` | Any session or delegate | Runs the check's fenced command from `plan.md` (or records an observation); code tree and check-text hash | Code checkout not clean outside `.harness/` before or after | 1 |
+| `phase <name> enter\|exit [--handoff]` | Controlling session (you for manual build enter) | Phase event; first `build enter` snapshots `plan.approved.md` | Default branch; delegate; triage without a passing session probe; `plan.md` without a goal or usable checks (every command but `triage enter`, H10) | 1 |
+| `check [--task ID] <C-id>\|--all [--observed pass\|fail]` | Any session or delegate | Runs the check's fenced command from `plan.md` (or records an observation); code tree and check-text hash | Code checkout not clean outside `.harness/` before or after; after `ready` or a handoff exit, until a phase enter (H5) | 1 |
 | `rebase` | Build phase; `pr --refresh` | Commit `.harness/`, fetch (retry on lock), `rebase --merge`, by-id memory cleanup, conflict rerun flow (parent) | Uncommitted changes outside `.harness/` (unless a rebase it started is stopped) | 1 (memory cleanup 2) |
-| `pr <task-id>` | Controlling session | Gate pre-check, commit `.harness/`, push (`--set-upstream`; `--force-with-lease` after a rebase), `gh pr create`, `ready` + `pr`, commit, push | Failing or stale checks; no `triage enter`; delegate | 1 |
-| `pr --refresh <task-id>` | You | `build enter`, `rebase`, `check --all`, force-with-lease push, re-emit `ready`; on conflict: abort and `build exit` | — | 1 |
+| `pr [<task-id>] [--title T]` | Controlling session | Runnable checks must pass; commit `.harness/`, push (hooked; `--set-upstream`; `--force-with-lease` after a rebase), open or update the PR; observational checks not yet passed at this code tree: `pr`, PR body 'not ready', no `ready`; else `ready` (revalidated under the spool lock) + `pr`, commit, push (no hook), print the merge rule (H5–H7) | `plan.md` without a goal or usable checks (H10); failing or stale runnable checks; a check that failed while the PR opened; no `triage enter`; delegate; after `ready` or a handoff exit until a phase enter | 1 |
+| `pr --refresh <task-id>` | You (the agent when `merge` is `agent`, H4) | `build enter`, `rebase`, `check --all`, force-with-lease push, re-emit `ready`; on conflict: abort and `build exit`; observational checks owed at the rebased code: PR body 'not ready', `build exit --handoff` (H5) | — | 1 |
 | `close <task-id> --done\|--abandon` | You | Disposition event | — | 1 |
 | `score` | You | §10 | — | 1 (full metrics 3) |
 | `hook <agent> <event>` | Hook entries | Adapter → spool | (never fails the agent) | 1 (Codex 2) |
@@ -559,9 +586,11 @@ Environment failures are independent of the arm, so they add noise, not bias.
 3. Every spool append, and every task `events.jsonl` append, takes the spool's exclusive file lock and
    writes one complete line (a controller and a delegate may write at the same moment); `start --new`
    holds the lock across uniqueness check, assignment and append. Readers ignore an incomplete last line.
+   CLI events take their timestamp under that lock (H12).
 4. `git fetch` retries with backoff on ref-lock errors (tested: concurrent fetches from several
    worktrees fail about half the time without it).
-5. Only the controlling session (or you, for `pr --refresh` and manual `build enter`) issues `phase`,
+5. Only the controlling session (or you, for `pr --refresh` and manual `build enter`; the agent may run
+   `pr --refresh` when `merge` is `agent`, H4) issues `phase`,
    `review` and `pr`; delegates only `check`.
 6. Hook handlers never block or fail the agent; CLI commands fail loudly and never drop events.
 7. While a rebase is stopped, only conflict resolution, plain `harness start` (spool only) and the
@@ -671,6 +700,8 @@ to a file in a writable root; after `claude --resume`, SessionStart fires again 
 | Operator knows the arm (v1) | Disclosed, as in the parent |
 | You forget `pr --refresh`, merge after `main` moved, or use GitHub's "Update branch" | The gate marks the task not-done (the merged tree differs from the `ready` tree); the scorecard says why. mvp's branch protection (strict status checks) blocks such merges; echo-wiki has none, so follow §17 there |
 | The per-machine state directory is lost | Back it up with the machine |
+| Rebase merges: a commit added after the last `ready` is not seen by the gate | Use squash or merge commits (harness `docs/project-setup.md`); the gate stays forge-free (§9.8) |
+| `merge: agent` in a repository with a merge queue: `gh pr merge` may enable auto-merge | Not supported; the printed rule excludes it |
 
 ---
 
