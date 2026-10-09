@@ -4787,7 +4787,7 @@ class InstructionsTest(unittest.TestCase):
 - [ ] **Step 2: Run the test to see it fail**
 
 Run: `python3.12 -m unittest tests.test_instructions -v`
-Expected: FAIL (`test_slice1_phase_files_exist`: empty set).
+Expected: ERROR (`FileNotFoundError` for `AGENTS.md`).
 
 - [ ] **Step 3: Write the files**
 
