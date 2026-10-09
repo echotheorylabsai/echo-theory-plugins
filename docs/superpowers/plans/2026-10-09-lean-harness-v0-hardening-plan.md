@@ -25,8 +25,8 @@ with `docs/superpowers/` (this repo).
 and are small), then the user's review protocol on the PR: independent adversarial reviews by Fable
 (`fable-reviewer`) and GPT Astra (`codex:codex-rescue`, `--model gpt-6-astra --effort xhigh --fresh`).
 
-**Revision:** r2 (2026-10-09), after round-1 reviews by Fable and GPT Astra (both REVISE). The review
-log at the end lists every finding and how r2 handles it.
+**Revision:** r3 (2026-10-09). Round 1: Fable and GPT Astra both REVISE. Round 2: Fable APPROVE, GPT
+Astra REVISE. The review log at the end lists every finding and how each revision handles it.
 
 ## Global Constraints
 
@@ -49,7 +49,7 @@ log at the end lists every finding and how r2 handles it.
 | #35 gate reads only the first id after `Check:` | prereqs-table card stays not-done after `close --done`; `planfile.DECISION_CHECK_RE` | Parse a comma list, each id bounded | 1 |
 | #26 `state.json` trusted for the phase | M1 s2 hand-edited `phase` to `verify`; `phase.py`, `pr.py` read it | Phase comes from the event log; `state.json` keeps only `task_id`, `branch`, `created_at` | 2 |
 | #28 plan rewritten without checks; #17 headings inside fences | M1 s2 dropped `## Acceptance checks`; a `## ` comment inside a check command splits the plan | Fence-aware parsing; every `phase` command (except `triage enter`) refuses an unusable `plan.md` | 3 |
-| #41 observed check that needs the PR | E2 C8 ("CI passes on this PR") could not be recorded before `harness pr`; agent had to drop and restore it | Runnable checks gate opening the PR; observational checks gate `ready`; after a handoff, work starts with a phase enter; `ready` is revalidated under the spool lock | 4 |
+| #41 observed check that needs the PR | E2 C8 ("CI passes on this PR") could not be recorded before `harness pr`; agent had to drop and restore it | Runnable checks gate opening the PR; observational checks gate `ready`; after a handoff, work starts with a phase enter; `ready` is revalidated under the spool lock; CLI events take their timestamp under that lock and the gate counts attempts before the last `ready` in log order | 4 |
 | P2/W3, #6 PR titles | mvp `main`: `Fix ECH-200: … must emit the (#553)` breaks conventional commits | `harness pr --title`; default cut at a word | 5 |
 | #37 `pr` needs the task id | E4 s2's first `harness pr --refresh` failed on usage | Task id optional, resolved like `phase`/`check` | 5 |
 | Q1, #29/P1 merge rule | User wants agents able to merge when mandated (cloud); mvp's skill says `--auto` | `project.json` `merge: user\|agent`, printed by `harness pr` at `ready` | 5 |
@@ -520,15 +520,24 @@ git commit -m "fix(plan): fence-aware parsing; phase commands refuse an unusable
 ### Task 4: Runnable checks gate the PR; observational checks gate `ready` (#41)
 
 **Files:**
-- Modify: `harness/gate.py` (`unmet_checks`, `failing_checks`, `needs_phase_enter`),
-  `harness/commands/check.py:25-26`, `harness/commands/pr.py` (`pr_body`, `publish`, `refresh`, `run`)
-- Test: `tests/test_pr.py`, `tests/test_gate.py`
+- Modify: `harness/gate.py` (`unmet_checks`, `failing_checks`, `needs_phase_enter`, `evaluate`),
+  `harness/spool.py` (`append`), `harness/context.py` (`record`), `harness/commands/check.py:25-26`,
+  `harness/commands/phase.py` (`exit_phase`, `_write`), `harness/commands/start.py` (`_where`),
+  `harness/commands/pr.py` (`pr_body`, `publish`, `refresh`, `run`)
+- Test: `tests/test_pr.py`, `tests/test_gate.py`, `tests/test_spool.py`
 
 **Interfaces:**
-- Produces: `gate.unmet_checks(plan_text, events, code_tree, before_ts=None) -> dict[str, str]`
-  (check id → reason); `gate.failing_checks(...)` keeps its signature and output.
+- Produces: `gate.unmet_checks(plan_text, events, code_tree) -> dict[str, str]` (check id → reason);
+  `gate.failing_checks(plan_text, events, code_tree) -> list[str]` (the `before_ts` parameter is
+  removed: `evaluate` passes only the events before the last `ready`, in log order).
 - Produces: `gate.needs_phase_enter(events) -> str | None`: why the next `check` or `pr` must wait for
-  a phase enter (after `ready`: `build enter`, R-5; after a handoff exit: a phase enter), else None.
+  a phase enter (after `ready`: `build enter`, R-5; after a handoff exit: the next phase's enter), else
+  None.
+- `spool.append(state_dir, event, task_events=None, *, held=False, stamp=False)`: with `stamp`, the
+  event's `ts` is set under the lock; `context.record` always stamps, so CLI events' log order is their
+  time order.
+- `phase.exit_phase(ctx, task_id, name, handoff=False, held=False)`: `held` records under a lock the
+  caller already holds.
 - `pr.publish(ctx, project, task_id) -> tuple[str, ...]`: the observational check ids still owed;
   `()` means `ready` was emitted.
 - `pr.pr_body(task_id, plan, scope, pending=()) -> str`.
@@ -541,9 +550,29 @@ Append to `GateTest` in `tests/test_gate.py`:
     def test_needs_phase_enter_after_ready_or_a_handoff_exit(self):  # R-5, gap #41
         self.assertIsNone(gate.needs_phase_enter([]))
         self.assertIn("build enter", gate.needs_phase_enter([ev("ready", 1)]))
-        handoff = ev("phase", 2, phase="build", action="exit", handoff=True)
-        self.assertIn("handoff", gate.needs_phase_enter([handoff]))
-        self.assertIsNone(gate.needs_phase_enter([handoff, ev("phase", 3, phase="build", action="enter")]))
+        handoff = ev("phase", 2, phase="research", action="exit", handoff=True)
+        self.assertIn("a handoff closed research", gate.needs_phase_enter([handoff]))
+        self.assertIsNone(gate.needs_phase_enter([handoff, ev("phase", 3, phase="plan", action="enter")]))
+
+    def test_attempts_count_before_the_last_ready_in_log_order(self):  # same-millisecond ties
+        tie = [check(1, "C1", "fail"), check(2, "C2"), check(3, "C1"), ev("ready", 3, code_tree="T1")]
+        self.assertTrue(gate.evaluate(PLAN, PLAN, tie, "T1").passed)
+        logged_after = PASSING + [check(3, "C1", "fail")]
+        self.assertTrue(gate.evaluate(PLAN, PLAN, logged_after, "T1").passed)
+```
+
+In `GateTest.test_failing_checks` replace the `before_ts=` assertion (line 35) with
+`self.assertEqual(gate.failing_checks(PLAN, later_fail[:2], "T1"), [])`.
+
+Append to `SpoolTest` in `tests/test_spool.py`:
+
+```python
+    def test_stamped_appends_take_their_time_under_the_lock(self):  # CLI log order = time order
+        spool.append(self.tmp, events.make("check", "cli", "2000-01-01T00:00:00.000Z"), stamp=True)
+        spool.append(self.tmp, events.make("check", "cli", "2000-01-01T00:00:00.000Z"))
+        stamped, kept = spool.read(self.tmp)
+        self.assertGreater(stamped["ts"], "2026-01-01")
+        self.assertEqual(kept["ts"], "2000-01-01T00:00:00.000Z")
 ```
 
 Add `import sys` and `from pathlib import Path` to the imports of `tests/test_pr.py`, add `REPO` and
@@ -609,10 +638,10 @@ Add `import sys` and `from pathlib import Path` to the imports of `tests/test_pr
         self.assertEqual(self.h(wt, env, "check", "C2", "--observed", "pass").returncode, 0)
         self.assertIn("ready:", self.h(wt, env, "pr", task_id).stdout)
 
-    def test_a_check_that_fails_while_the_pr_opens_blocks_ready(self):  # ready revalidated under the lock
-        wt, env, task_id = self.built("pr-race")
+    def late_fail_hook(self, wt, task_id):
+        """A pre-push hook that logs a failing C1 attempt, as a delegate could while `harness pr` pushes."""
         spool_file = spool.project_dir(self.sb.env, gitio.info(wt).common_dir) / "spool.jsonl"
-        script = self.sb.tmp / "late_fail.py"
+        script = self.sb.tmp / f"late_fail_{task_id}.py"
         script.write_text(
             "import sys\n"
             f"sys.path.insert(0, {str(REPO)!r})\n"
@@ -624,17 +653,31 @@ Add `import sys` and `from pathlib import Path` to the imports of `tests/test_pr
         hook.write_text(f"#!/bin/sh\n{sys.executable} {script}\n")
         hook.chmod(0o755)
         self.addCleanup(hook.unlink)
+
+    def test_a_check_that_fails_while_the_pr_opens_blocks_ready(self):  # ready revalidated under the lock
+        wt, env, task_id = self.built("pr-race")
+        self.late_fail_hook(wt, task_id)
         r = self.h(wt, env, "pr", task_id)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("changed while the PR was opening", r.stderr)
         self.assertNotIn("ready", [k for k, _, _ in self.kinds(wt, task_id)])
+        self.assertEqual(gate.open_phase(self.task_events(wt, task_id)), "verify")  # still open: retry works
+
+    def test_a_late_failure_during_refresh_still_hands_back(self):  # the phase closes only with `ready`
+        wt, env, task_id = self.built("pr-race-refresh")
+        self.assertEqual(self.h(wt, env, "pr", task_id).returncode, 0)
+        self.late_fail_hook(wt, task_id)
+        r = self.h(wt, {}, "pr", "--refresh", task_id)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        last = [e for e in self.sb.task_file_events(wt, task_id) if e["kind"] == "phase"][-1]
+        self.assertEqual((last["phase"], last["action"], last["handoff"]), ("build", "exit", True))
 ```
 
 - [ ] **Step 2: Run them to verify they fail**
 
 Run: `python3 -m pytest -q tests/test_gate.py tests/test_pr.py`
-Expected: the four new tests fail (`needs_phase_enter` missing; `pr` refuses with "C2: no recorded
-attempt"; `ready` is emitted despite the late failure).
+Expected: the new tests fail (`needs_phase_enter` and `stamp` missing; the same-millisecond tie fails
+the gate; `pr` refuses with "C2: no recorded attempt"; `ready` is emitted despite the late failure).
 
 - [ ] **Step 3: Implement in `harness/gate.py`**
 
@@ -649,25 +692,25 @@ def needs_phase_enter(events: list[dict]) -> str | None:
         return "after `ready`, run `harness phase build enter` first"
     phases = _of(events, "phase")
     if phases and phases[-1].get("action") == "exit" and phases[-1].get("handoff"):
-        return f"a handoff closed {phases[-1].get('phase')}: run `harness phase build enter` first"
+        return (f"a handoff closed {phases[-1].get('phase')}: enter the phase you continue in "
+                "(`harness phase <name> enter`) first")
     return None
 ```
 
 Replace `failing_checks` with:
 
 ```python
-def unmet_checks(plan_text: str, events: list[dict], code_tree: str | None,
-                 before_ts: str | None = None) -> dict[str, str]:
-    """Final checks whose latest completed attempt (before before_ts) did not pass at code_tree with
-    the check text in plan_text, each with its reason. A check with no attempt is unmet (§6.11)."""
-    attempts = [e for e in _of(events, "check") if before_ts is None or e["ts"] < before_ts]
+def unmet_checks(plan_text: str, events: list[dict], code_tree: str | None) -> dict[str, str]:
+    """Final checks whose latest attempt in events did not pass at code_tree with the check text in
+    plan_text, each with its reason. A check with no attempt is unmet (§6.11)."""
+    attempts = _of(events, "check")
     out = {}
     for cid, check in planfile.checks(plan_text).items():
         mine = [e for e in attempts if e.get("check_id") == cid]
         if not mine:
             out[cid] = "no recorded attempt"
             continue
-        last = max(mine, key=lambda e: e["ts"])
+        last = mine[-1]  # log order (CLI events are stamped under the spool lock)
         if last.get("result") != "pass":
             out[cid] = f"latest attempt {last.get('result')}"
         elif last.get("code_tree") != code_tree:
@@ -677,12 +720,49 @@ def unmet_checks(plan_text: str, events: list[dict], code_tree: str | None,
     return out
 
 
-def failing_checks(plan_text: str, events: list[dict], code_tree: str | None, before_ts: str | None = None) -> list[str]:
+def failing_checks(plan_text: str, events: list[dict], code_tree: str | None) -> list[str]:
     """unmet_checks as `C<n>: <reason>` lines; a plan with no checks fails (§6.11)."""
     if not planfile.checks(plan_text):
         return ["plan.md has no acceptance checks"]
-    return [f"{cid}: {why}" for cid, why in unmet_checks(plan_text, events, code_tree, before_ts).items()]
+    return [f"{cid}: {why}" for cid, why in unmet_checks(plan_text, events, code_tree).items()]
 ```
+
+In `evaluate`, replace the `else:` branch under `if not readies:` with:
+
+```python
+    else:
+        i = max(n for n, e in enumerate(events) if e.get("kind") == "ready")  # events are time-ordered
+        last = events[i]
+        if merge_code_tree is not None and last.get("code_tree") != merge_code_tree:
+            reasons.append("merged code differs from the last ready tip (run `harness pr --refresh` before merging)")
+        reasons += failing_checks(final_plan, events[:i], last.get("code_tree"))  # attempts logged before it
+```
+
+In `harness/spool.py`, replace `append` with:
+
+```python
+def append(state_dir: Path, event: dict, task_events: Path | None = None, *, held: bool = False,
+           stamp: bool = False) -> None:
+    """Append one complete line to the spool, and to the task's events.jsonl when given. With stamp,
+    the event takes its timestamp under the lock, so stamped events' log order is their time order."""
+    with nullcontext() if held else locked(state_dir):
+        line = events.dumps({**event, "ts": events.now_ts()} if stamp else event).encode()
+        for path in [state_dir / "spool.jsonl", *([task_events] if task_events else [])]:
+            try:
+                fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+                try:
+                    os.write(fd, line)
+                finally:
+                    os.close(fd)
+            except OSError as e:
+                raise HarnessError(f"cannot append to {path}: {e}. {FIX}") from e
+```
+
+and in `harness/context.py`, `record`, change the last line to
+`spool.append(ctx.state_dir, ev, task_file, held=held, stamp=True)`.
+
+In `harness/commands/phase.py`, give `exit_phase` and `_write` a `held: bool = False` parameter and pass
+it through to `context.record(..., held=held)`, so `publish` can close the phase under its lock.
 
 - [ ] **Step 4: Use it in `harness/commands/check.py`**
 
@@ -693,6 +773,17 @@ Replace lines 25–26 with:
     if blocked:
         raise HarnessError(blocked)
 ```
+
+In `harness/commands/start.py`, `_where`, replace its first two lines (the `needs_build_enter` test)
+with:
+
+```python
+    blocked = gate.needs_phase_enter(evs)
+    if blocked:
+        return f"phase: none open; {blocked}"
+```
+
+and in `BootstrapTest.test_bootstrap_prints_the_tasks_phase` nothing changes (it never reaches `ready`).
 
 - [ ] **Step 5: Implement the pending path in `harness/commands/pr.py`**
 
@@ -737,9 +828,6 @@ def publish(ctx, project: dict, task_id: str) -> tuple[str, ...]:
     if not (folder / "plan.approved.md").exists():  # R-49: the done gate needs it and a merge can't create it
         raise HarnessError("no plan.approved.md: run `harness phase build enter` first (its first entry snapshots the plan)")
     pending = tuple(unmet)  # only observational checks remain
-    current = gate.open_phase(evs)
-    if current and not pending:
-        phase.exit_phase(ctx, task_id, current)  # a ready writes the missing exit first
     remote, base, branch = project["integration_remote"], project["default_branch"], ctx.git.branch
     gitio.commit_paths(ctx.root, ".harness", f"harness: record {task_id}")
     gitio.push(ctx.root, remote, branch)
@@ -759,10 +847,14 @@ def publish(ctx, project: dict, task_id: str) -> tuple[str, ...]:
         return pending
     tip = gitio.out(["rev-parse", "HEAD"], ctx.root)
     with spool.locked(ctx.state_dir):  # no check can land between this read and `ready`
-        late = gate.failing_checks(plan, context.task_events(ctx, task_id), tree)
-        if late:
+        now = context.task_events(ctx, task_id)
+        late = gate.failing_checks(plan, now, tree)
+        if late:  # the phase stays open, so a retry or refresh's hand-back still works
             raise HarnessError("a check changed while the PR was opening; run `harness pr` again:\n"
                                + "\n".join(late))
+        current = gate.open_phase(now)
+        if current:
+            phase.exit_phase(ctx, task_id, current, held=True)  # a ready writes the missing exit first
         context.record(ctx, context.event(ctx, "ready", task_id, tip_commit=tip, code_tree=tree), held=True)
     gitio.commit_paths(ctx.root, ".harness", f"harness: ready {task_id}")
     try:
@@ -815,9 +907,9 @@ In `run`, replace the last line with:
     return 0
 ```
 
-The `pr` event is now recorded right after `pr_create` (before `ready`); update
+The `pr` event is now recorded right after `pr_create`, and the phase exit right before `ready`; update
 `test_publish_pushes_opens_one_pr_and_records_ready` to expect the last three kinds as
-`[("phase", "verify", "exit"), ("pr", None, None), ("ready", None, None)]`. `test_check.py`'s
+`[("pr", None, None), ("phase", "verify", "exit"), ("ready", None, None)]`. `test_check.py`'s
 `test_after_ready_checks_need_a_build_enter` keeps passing ("build enter" is in the new message).
 
 - [ ] **Step 6: Run the full suite**
@@ -1023,7 +1115,8 @@ git commit -m "feat(pr): --title, task id from the branch, printed merge rule, o
 - Test: `tests/test_timing.py`
 
 **Interfaces:** unchanged signatures (`timing.wall`, `timing.agent_time`). For timing, the controlling
-session is the session of the latest phase enter or `resume` (a `harness start`) that names one.
+session is the session of the latest phase enter (none for your manual commands) or `resume` (a
+`harness start`).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1051,6 +1144,12 @@ Append to `WallTest` in `tests/test_timing.py`:
         w = self.wall([ev("start", 0), ph(1, "build", "enter"), hook("session_end", 5, session="REVIEW"),
                        ph(29, "build", "exit"), ev("ready", 30)])
         self.assertEqual(w.total_ms, 30 * MIN)
+
+    def test_your_manual_refresh_is_not_paused_by_the_old_agent(self):  # gap #40
+        first = [ev("start", 0), ph(1, "build", "enter"), ph(29, "build", "exit"), ev("ready", 30)]
+        w = self.wall(first + [ph(100, "build", "enter", session=None), hook("session_end", 105),
+                               ph(109, "build", "exit", session=None), ev("ready", 110)])
+        self.assertEqual(w.total_ms, 40 * MIN)
 ```
 
 In `AgentTimeTest.test_prompt_to_last_stop_per_session_plus_helpers` change the comment on S2's line to
@@ -1069,13 +1168,15 @@ and append to `AgentTimeTest`:
         evs = [hook("prompt", 0), hook("stop", 10), hook("prompt", 20), hook("stop", 30), hook("prompt", 40),
                hook("stop", 50)]
         self.assertEqual(timing.agent_time(evs, BASE + 25 * MIN).total_ms, (10 + 5) * MIN)
+        late = timing.agent_time(evs + [hook("prompt", 60), hook("subagent_start", 61, agent_id="a9")], BASE + 25 * MIN)
+        self.assertEqual(late.unknown_spans, 0)  # nothing that starts after the cutoff counts
 ```
 
 - [ ] **Step 2: Run them to verify they fail**
 
 Run: `python3 -m pytest -q tests/test_timing.py`
-Expected: 4 failures (the two pause tests charge idle time; the agent-time tests get 14 and 30
-minutes); the other-session test already passes and guards the rule's scope.
+Expected: failures in the two pause tests (idle time charged) and the agent-time tests (14 and 30
+minutes); the other-session and manual-refresh tests may already pass and guard the rule's scope.
 
 - [ ] **Step 3: Implement**
 
@@ -1086,7 +1187,7 @@ def charged_intervals(events: list[dict], until_ms: int) -> tuple[list[tuple[int
     """Spans the wall clock runs. `ready`, a handoff exit and an abandon pause it; a later revision
     restarts at its resume or build enter (R-2). The controlling session's end also pauses it, and the
     task's next `harness` command restarts it (gap #40). The controlling session is the one of the
-    latest phase enter or `resume` that names a session."""
+    latest phase enter (none for your manual commands) or `resume`."""
     intervals, missing = [], []
     started, running, since, resumes = False, False, 0, {}
     controller, ended = None, False
@@ -1115,10 +1216,10 @@ def charged_intervals(events: list[dict], until_ms: int) -> tuple[list[tuple[int
             sid = e.get("controlling_session")
             since = resumes.get(sid, t) if sid else t  # R-2
             running = True
-        if enter and e.get("controlling_session"):
-            controller = e["controlling_session"]
-        elif kind == "resume" and e.get("session_id"):
-            controller = e["session_id"]
+        if enter:
+            controller = e.get("controlling_session")  # your manual enters clear it
+        elif kind == "resume":
+            controller = e.get("session_id")
     if not started:
         missing.append("no start event")
     elif running:
@@ -1137,7 +1238,11 @@ In `agent_time`, replace the `if kind in ("prompt", "session_end"):` branch with
                 prompt_t, stop_t = (ts_ms(e["ts"]), None) if kind == "prompt" else (None, None)
 ```
 
-just before `by_phase = split_by_phase(...)` add:
+cut everything at the cutoff (gap #15): in `close`, change the first test to
+`if prompt_t is None or prompt_t >= until_ms: return`; for a `subagent_stop` without a start, count it
+unknown only when its own time is before `until_ms`; replace `unknown += len(helpers)` with
+`unknown += sum(1 for started in helpers.values() if started < until_ms)`; and just before
+`by_phase = split_by_phase(...)` add:
 
 ```python
     spans = [(a, min(b, until_ms)) for a, b in spans if a < until_ms]  # nothing after the clock stops (gap #15)
@@ -1218,8 +1323,11 @@ If another agent launched you, ignore this file and follow your prompt. Otherwis
 
 `skills/phases/build.md`:
 - **Commands** line and step 7: write `harness pr <task-id> --title "<title>"`.
-- Last paragraph: "After `ready`, or after a handoff, any edit, rebase or check starts with
-  `harness phase build enter`. Running `harness pr` again re-emits `ready` without opening a second PR."
+- Step 7, first line: "7. Build ends when every check passes after the rebase, except checks that need
+  the open PR (verify records those after `harness pr` opens it)." 
+- Last paragraph: "After `ready`, any edit, rebase or check starts with `harness phase build enter`;
+  after a handoff, with the enter of the phase you continue in. Running `harness pr` again re-emits
+  `ready` without opening a second PR."
 
 `skills/phases/verify.md`:
 - **Commands** line: replace `harness phase verify exit`, `harness pr <task-id>` with
@@ -1353,31 +1461,35 @@ rollout steps below. It ends with the attribution line.
 
 | § | Replace | With |
 |---|---|---|
-| Header | `Status: approved 2026-10-08 (Fable review: APPROVE) · owner: the user (sole developer).` | `Status: approved 2026-10-08 (Fable review: APPROVE); amended 2026-10-09 by the v0 hardening plan (H1–H11 in §2.2) · owner: the user (sole developer).` |
-| 2.2 | (table end) | Add rows H1–H11 (list below), Type **A** (added) or **O** (override), Why = the gap number and the task that showed it |
+| Header | `Status: approved 2026-10-08 (Fable review: APPROVE) · owner: the user (sole developer).` | `Status: approved 2026-10-08 (Fable review: APPROVE); amended 2026-10-09 by the v0 hardening plan (H1–H12 in §2.2) · owner: the user (sole developer).` |
+| 2.2 | (table end) | Add rows H1–H12 (list below), Type **A** (added) or **O** (override), Why = the gap number and the task that showed it |
 | 3 | Controlling session: "…for the task (recorded in `state.json`)" | "…for the task (the session of the latest phase enter, or of the latest `harness start` in the task, from the event log)" (H2) |
 | 4.6 | "`harness pr`'s push still triggers the project's pre-push hook (mvp runs `npm run preflight`), and that time is charged to the task because it is real;" | "`harness pr`'s first push triggers the project's pre-push hook (mvp runs `npm run preflight`), and that time is charged to the task because it is real; its follow-up push adds only harness bookkeeping in `.harness/` on the same code tree and skips the hook (H7); the agent writes the PR title in the project's commit style (`--title`, H6);" |
+| 5.2 Build row | Ends when: "All milestones' checks pass after the rebase" | "All milestones' checks pass after the rebase, except checks that need the open PR (H5)" |
 | 5.2 Verify row | Ends when: "Every final check passes; a failure returns to build" | "Every check that can pass before the PR passes; a failure returns to build; checks that need the open PR are recorded after `harness pr` opens it (H5)" |
 | 5.2 PR row | "Passing checks → an open PR and `ready`" / "`harness pr <task-id>`" / "`ready` emitted" | "Runnable checks pass → an open PR; every check passes, observational ones included → `ready`" / "`harness pr [<task-id>] [--title T]`" / "`ready` emitted (until then the PR body says it is not ready)" (H5) |
-| 5.2 after the table | "After `ready`: any edit, rebase or check starts with `harness phase build enter`;" | "After `ready` or a handoff exit: any edit, rebase or check starts with `harness phase build enter` (`check` and `pr` refuse until then, H5);" |
+| 5.2 after the table | "After `ready`: any edit, rebase or check starts with `harness phase build enter`;" | "After `ready`: any edit, rebase or check starts with `harness phase build enter`; after a handoff exit, with the enter of the phase the successor continues in (`check` and `pr` refuse until then, H5);" |
 | 5.5 | Template `<date time> · …`; "one stamped line per entry" | Template `<date> · …`; "one dated line per entry; the event log holds exact times" (H8); `Check:` may list ids (`Check: C6, C7`) (H1) |
 | 5.7 | "A re-plan may change a check only with a Decision naming it (`Check: C3`, or `Check: goal`)." | "A re-plan may change a check only with a Decision naming it (`Check: C3`, `Check: C6, C7`, or `Check: goal`)." (H1) |
 | 6.1 | `state.json` row: "`start --new`; `harness phase`" / "Start; every phase enter/exit" | "`start --new`" / "Start" (H2) |
 | 6.2 | (table) | Add row: `merge` · `"user"` · "Who merges after `ready`: `user`, or `agent` (after `pr --refresh`, with `gh pr merge --match-head-commit`; not with a merge queue); printed by `harness pr`; never auto-merge" (H4) |
 | 6.4 | "`task_id`, `branch`, `phase`, `phase_open` (bool), `controlling_session` (nullable), `created_at`." | "`task_id`, `branch`, `created_at`. The open phase comes from the task's phase events, and `harness start` prints it; nothing reads a phase from `state.json` (H2)." |
 | 6.5 | "S plans hold only the first five." | "S plans hold the first five, plus `## Decisions` when one is logged (H11)." |
-| 6.10 | After "…from a `--handoff` phase exit to the successor's `resume`." | Add: "The controlling session's end (§3) also pauses the clock, and the task's next `harness` command restarts it: no harness-driven agent works in between. Work by a session that never runs a `harness` command is not charged. A session waiting for your reply stays alive and stays charged; an adapter without a session-end event keeps the clock running (H3)." In the agent-time sentence, after "before the next prompt or session end", add: "(a prompt that arrives before any stop, such as a queued message delivered mid-turn, closes the open span at that prompt), cut at the clock's stop (H9)" |
+| 6.10 | After "…from a `--handoff` phase exit to the successor's `resume`." | Add: "The controlling session's end (§3) also pauses the clock, and the task's next `harness` command restarts it: no harness-driven agent works in between. Work by a session that never runs a `harness` command is not charged. A session waiting for your reply stays alive and stays charged; an adapter without a session-end event keeps the clock running; a second session that runs `harness start` while the controller still works takes over as controller (H3)." In the agent-time sentence, after "before the next prompt or session end", add: "(a prompt that arrives before any stop, such as a queued message delivered mid-turn, closes the open span at that prompt), cut at the clock's stop; nothing that starts after the stop counts, not even as unknown (H9)" |
+| 6.11 | "the latest completed attempt before the last `ready` passed" | "the latest attempt logged before the last `ready` passed (CLI events take their timestamp under the spool lock, so log order is time order, H12)" |
 | 7 | `phase` row, Does: "`state.json` + phase event; first `build enter` snapshots `plan.approved.md`" | "Phase event; first `build enter` snapshots `plan.approved.md`"; Refuses when: add "`plan.md` without a goal or usable checks (every command but `triage enter`) (H10)" |
 | 7 | `check` row, Refuses when | Add: "after `ready` or a handoff exit, until a phase enter (H5)" |
 | 7 | `pr <task-id>` row | Command `pr [<task-id>] [--title T]`; Does: "Runnable checks must pass; commit `.harness/`, push (hooked), open or update the PR; observational checks not yet passed at this code tree: `pr`, PR body 'not ready', no `ready`; else `ready` (revalidated under the spool lock) + `pr`, commit, push (no hook), print the merge rule"; Refuses when: "Failing or stale runnable checks; a check that failed while the PR opened; no `triage enter`; delegate; after `ready` or a handoff exit until a phase enter" (H5–H7) |
 | 7 | `pr --refresh` row | Run by: "You (the agent when `merge` is `agent`)"; Does: add "observational checks owed at the rebased code: PR body 'not ready', `build exit --handoff`" (H4, H5) |
+| 9 item 3 | "…takes the spool's exclusive file lock and writes one complete line…" | Add: "CLI events take their timestamp under that lock (H12)." |
 | 9 item 5 | "Only the controlling session (or you, for `pr --refresh` and manual `build enter`)" | "Only the controlling session (or you, for `pr --refresh` and manual `build enter`; the agent may run `pr --refresh` when `merge` is `agent`)" (H4) |
 | 14 | (table) | Add rows: "Rebase merges: a commit added after the last `ready` is not seen by the gate · Use squash or merge commits (`docs/project-setup.md`); the gate stays forge-free (§9.8)" and "`merge: agent` in a repository with a merge queue: `gh pr merge` may enable auto-merge · Not supported; the printed rule excludes it" |
 
 H1 Decision lists · H2 phase from events · H3 controller-end pause · H4 merge rule · H5 observational
 checks after the PR and phase enter after a handoff · H6 PR title · H7 one hooked push · H8 date-only
 notes · H9 mid-turn prompts and cutoff · H10 plan validation with fence-aware parsing · H11 S-plan
-Decisions.
+Decisions · H12 CLI timestamps under the spool lock; the gate counts attempts before the last `ready` in
+log order.
 
 - [ ] **Step 2: Re-read the whole spec for sentences that now contradict a delta** (§4.4, §5.2, §6.11,
   §7, §9, §17) and fix each in the same commit.
@@ -1386,7 +1498,7 @@ Decisions.
 
 ```bash
 git add docs/superpowers/specs/2026-10-08-lean-harness-v0-product-spec.md
-git commit -m "docs(lean-harness): spec deltas H1–H11 from the v0 hardening plan"
+git commit -m "docs(lean-harness): spec deltas H1–H12 from the v0 hardening plan"
 ```
 
 ---
@@ -1412,3 +1524,17 @@ git commit -m "docs(lean-harness): spec deltas H1–H11 from the v0 hardening pl
 | 13 | Fable (minor) | Title test claimed "task id from the branch" but the env carried it | Test now removes `HARNESS_TASK_ID` |
 | 14 | Astra (YAGNI) | #36 "derivable" overstated | Deferred row reworded |
 | 15 | Fable (YAGNI, optional) | Cut the `merge` knob | Kept: the user asked that agents can merge when mandated (cloud); one key and one string, default unchanged |
+
+### Round 2 (r2 → r3): Fable APPROVE, GPT Astra REVISE
+
+| # | Reviewer | Finding | r3 |
+|---|---|---|---|
+| 1 | Astra (blocker) | `build.md` still says build ends when every check passes, so a PR-dependent check blocks reaching verify | Fixed: `build.md` step 7 and spec §5.2 Build row except checks that need the open PR (Task 7, Task 10) |
+| 2 | Astra (blocker) | Check events take their timestamp before the lock, so one can be logged after `ready` with an earlier time | Fixed: CLI events are stamped under the spool lock (`spool.append(stamp=True)` from `context.record`); the gate counts attempts before the last `ready` by log position; tie and spool tests (Task 4, spec H12) |
+| 3 | Astra (blocker) | Your manual refresh (no session) kept the old agent as controller, so its end paused the refresh | Fixed: every phase enter sets the controller, clearing it for manual enters; manual-refresh test (Task 6) |
+| 4 | Astra (blocker) | `publish` closed the phase before pushing; a late revalidation failure left nothing open, so refresh recorded no handoff | Fixed: the phase closes under the lock right before `ready` (`exit_phase(held=True)`); late-failure tests for `pr` and `--refresh` (Task 4) |
+| 5 | Astra (major), Fable (minor) | §5.2 delta and the guard's message said "build enter" after any handoff | Fixed: after a handoff, the enter of the phase you continue in (message, `build.md`, spec §5.2) |
+| 6 | Astra (major) | Prompts or helpers that start after the cutoff still counted as unknown | Fixed: unknown spans count only what starts before the cutoff (Task 6) |
+| 7 | Fable (minor) | `harness start` printed "build (exited)" after a handoff instead of the reason | Fixed: `_where` uses `needs_phase_enter` (Task 4) |
+| 8 | Fable (minor) | Controller-from-`resume` trade-off unstated | Stated in the §6.10 delta |
+| 9 | Astra | Rebase merges (#4) | Accepted as non-blocking under the stated boundary |
