@@ -506,7 +506,7 @@ retroactively for every task recorded since its raw data started.
 | `install` | You | Project files on a branch | Not a git repo | 1 |
 | `doctor` | Anyone | Install, pre-start and session probes (§8), read-only | — | 1 (Codex checks 2) |
 | `start --new <slug> --benchmark-tier T --request F` | You | §4.4 step 2; holds the spool lock across uniqueness check, assignment and `start` | An install or pre-start probe fails | 1 |
-| `start` | Bootstrap | Resolve task, session probe, `resume`, print checkout | (silent no-op outside a task; delegates: prints delegate notice) | 1 |
+| `start` | Bootstrap | Resolve task, install probes, not-cloud probe, session probe, `resume`, print checkout | (silent no-op outside a task; delegates: prints delegate notice) | 1 |
 | `phase <name> enter\|exit [--handoff]` | Controlling session (you for manual build enter) | `state.json` + phase event; first `build enter` snapshots `plan.approved.md` | Default branch; delegate; triage without a passing session probe | 1 |
 | `check [--task ID] <C-id>\|--all [--observed pass\|fail]` | Any session or delegate | Runs the check's fenced command from `plan.md` (or records an observation); code tree and check-text hash | Code checkout not clean outside `.harness/` before or after | 1 |
 | `rebase` | Build phase; `pr --refresh` | Commit `.harness/`, fetch (retry on lock), `rebase --merge`, by-id memory cleanup, conflict rerun flow (parent) | Uncommitted changes outside `.harness/` (unless a rebase it started is stopped) | 1 (memory cleanup 2) |
@@ -600,7 +600,7 @@ next starts.
 
 | Stage | Adds | Records | Exit criteria |
 |---|---|---|---|
-| **Phase 0** (short) | Capture hook-payload fixtures from both agents in a throwaway repo; a temporary hand-added logging hook for the user-level hook checks (removed afterwards; `install --user` is first exercised in Slice 1); confirm Claude desktop and Codex app sessions run the user-level hooks; confirm `git hash-object -t tree` runs inside a sandboxed `codex exec` | — | Each item confirmed, or its fallback chosen and written into this spec |
+| **Phase 0** (short) | Capture hook-payload fixtures from both agents in a throwaway repo; a temporary logging hook loaded per run (`claude -p --settings`) for the payload capture (removed afterwards); the desktop-app hook check by evidence from a desktop session (`install --user` is first exercised in Slice 1); confirm Claude desktop and Codex app sessions run the user-level hooks; confirm `git hash-object -t tree` runs inside a sandboxed `codex exec` | — | Each item confirmed, or its fallback chosen and written into this spec |
 | **Slice 1: one measured task (Claude)** | Spool, event schema v1, Claude adapter, `install`, `doctor` (install, pre-start and session probes, Claude), `start`, `phase`, `check`, `rebase` (no memory cleanup), `pr`, `pr --refresh`, `close`, `score` (resolution, gate, timing, agent time, coverage); phase files triage, research, resolve, plan, build, verify; `AGENTS.md` | Every raw input in §6.12 except `tier`, `defect` and harness memory events | One real mvp M task merged with a complete scorecard (all boundaries present, gate evaluated, no unexplained orphans); two tasks in parallel in mvp scored correctly |
 | **Slice 2: both agents, all phases (ready for real work)** | Codex adapter and install (hooks, approval step, writable root, bootstrap); retro phase, `retro-bundle`, harness memory, `memory`, `rebase` by-id cleanup; `tier`, `review`, `defect`; transcript cache | Everything in §6.12 | Claude and Codex tasks running concurrently in mvp; at least one echo-wiki task; a Claude task whose verify ran in a Codex delegate, with the delegate's check recorded; two parallel tasks' lessons merged cleanly; scorecards complete for all |
 | **Slice 3: full scorecard** | All seven metrics, tokens and dollars, topology rebuild, summary with spread per tier, note-line validation | — | Scorecards recomputed for every task since Slice 1; three tasks hand-checked against the scorer |
@@ -622,8 +622,9 @@ spans and memory events; they prove the instrumentation and stay outside any v1 
   under parallel appends; fetch retry under concurrent fetches; union merge plus by-id cleanup across
   two branches; `rebase` conflict stop and rerun; `pr` and `pr --refresh` against a local bare remote
   with a stubbed `gh`; gate across merge, squash and rebase merges.
-- **Adapter contract:** real Claude and Codex hook payloads, captured in Phase 0 from throwaway
-  sessions (the 2026-10-08 captures were not kept; §16 lists their fields), stored as fixtures; a changed
+- **Adapter contract:** real Claude and Codex hook payloads from throwaway sessions (Claude captured in
+  Phase 0, 2026-10-09; Codex captured at the start of Slice 2; the 2026-10-08 captures were not kept and
+  §16 lists their fields), stored as fixtures; a changed
   payload must produce a `format_warning`, never a crash. Remove the trust entries `codex exec` adds for
   throwaway folders afterwards (§16).
 - **End-to-end smoke:** one scripted task in a throwaway repo driven by real `claude -p` and
@@ -732,13 +733,14 @@ these additions: every event except SessionStart carries `prompt_id`; Stop and S
 `effort.level`; SessionEnd `reason` was `other` for a `-p` run. Extra fields seen and ignored:
 `scratchpad_dir`, `permission_mode`, `background_tasks`, `session_crons`, `stop_hook_active`,
 `last_assistant_message`. Codex fixtures were not captured (see §13).
-Claude desktop app (Code tab): hooks run (plugin SessionStart hooks fired in a desktop-app session).
+Claude desktop app (Code tab): hooks run (plugin SessionStart hooks fired in a desktop-app session);
+this evidence came from a desktop session whose bundled Claude Code was 2.1.293 (the CLI fixtures were 2.1.295).
 The agent's Bash `PATH` contains `~/.local/bin`, and `python3.12` resolves to
 `/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12`. A user-level hook entry was not
 exercised and the hook-process `PATH` was not captured, so hook entries call the dispatcher by absolute
 path. Codex app: not checked, deferred to Slice 2.
 `git hash-object -t tree --stdin` (no `-w`) inside a sandboxed `codex exec -s workspace-write`
-(`CODEX_SANDBOX=seatbelt`): exit 0, hash equals `HEAD^{tree}`. Task 1.4 uses `git hash-object`.
+(`CODEX_SANDBOX=seatbelt`): exit 0, hash equals `HEAD^{tree}`. The harness uses `git hash-object`.
 
 ---
 
