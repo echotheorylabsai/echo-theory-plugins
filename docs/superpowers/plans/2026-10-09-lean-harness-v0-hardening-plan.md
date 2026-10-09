@@ -7,8 +7,8 @@ clash with project rules, before the harness is used for production work and bef
 
 **Architecture:** Small, generic changes to the existing CLI and instruction files. The event log
 becomes the only source of a task's phase; `harness pr` separates "PR open" from `ready`; timing gains
-one pause rule and one span rule; instruction files gain a few lines. No new commands, no new event
-kinds, no project-specific code.
+one pause rule, one span rule and a cutoff; instruction files gain a few lines. No new commands, no new
+event kinds, no project-specific code.
 
 **Tech Stack:** Python 3.12 standard library only; `unittest` (run with `python3 -m pytest -q`); git;
 `gh`.
@@ -18,74 +18,80 @@ kinds, no project-specific code.
 `~/Desktop/src/echo-official/harness-tasks/project-clashes.md` (G1–G5, P1–P10, W1–W3, E1–E2).
 
 **Code:** `~/Desktop/src/echo-official/lean-harness` (GitHub `echotheorylabsai/lean-harness`), branch
-`v0-hardening` from `main` (`235cf61`). All file paths below are relative to that repo unless they start
+`v0-hardening` from `main` (`235cf61`). File paths below are relative to that repo unless they start
 with `docs/superpowers/` (this repo).
 
-**Execution:** Native (one implementer in one session; the tasks share `pr.py`, `phase.py` and
-`gate.py` and are small), then the user's review protocol on the PR: independent adversarial reviews by
-Fable (`fable-reviewer`) and GPT Astra (`codex:codex-rescue`, `--model gpt-6-astra --effort xhigh
---fresh`).
+**Execution:** Native (one implementer in one session: the tasks share `pr.py`, `phase.py`, `gate.py`
+and are small), then the user's review protocol on the PR: independent adversarial reviews by Fable
+(`fable-reviewer`) and GPT Astra (`codex:codex-rescue`, `--model gpt-6-astra --effort xhigh --fresh`).
+
+**Revision:** r2 (2026-10-09), after round-1 reviews by Fable and GPT Astra (both REVISE). The review
+log at the end lists every finding and how r2 handles it.
 
 ## Global Constraints
 
-- Python 3.12 stdlib only; tests are `unittest` classes; the suite must stay green after every task.
+- Python 3.12 stdlib only; tests are `unittest` classes; the suite stays green after every task.
 - No new `harness` commands and no new event kinds (spec §6.7 schema v1 unchanged).
 - Nothing project-specific in code or instruction files (no `mvp`, `echo-wiki`, `npm`, `preflight`).
-- Scoring stays idempotent over raw events (§6.12): re-scoring old tasks is allowed to change their
-  cards only where this plan changes a rule, and each such change is listed in Task 9.
+- Scoring stays idempotent over raw events (§6.12) and needs no forge API (§9.8): re-scoring old tasks
+  may change their cards only where this plan changes a rule; Task 9 lists each expected change.
 - Instruction files stay terse: one line per rule; `AGENTS.md` is read by every task session.
-- Agent-agnostic: every rule reads only fields both adapters emit (`session_end`, `prompt`, `stop`,
-  CLI events), so Slice 2 (Codex) stays additive.
-- Default behavior for already-installed projects is unchanged unless a gap requires it
-  (`project.json` without `merge` means `user`).
+- Agent-agnostic: every rule reads only fields any adapter can emit (`session_end`, `prompt`, `stop`,
+  CLI events). An adapter without a session-end event keeps today's timing (no pause), so Slice 2
+  (Codex) stays additive.
+- Default behavior of installed projects is unchanged unless a gap requires it (`project.json`
+  without `merge` means `user`).
 
 ## What this plan fixes, and why each is in
 
 | Gap | Evidence (testing-notes / clashes) | Fix | Task |
 |---|---|---|---|
-| #35 gate reads only the first id after `Check:` | prereqs-table card stays not-done after `close --done`; `planfile.DECISION_CHECK_RE` | Parse a comma list | 1 |
+| #35 gate reads only the first id after `Check:` | prereqs-table card stays not-done after `close --done`; `planfile.DECISION_CHECK_RE` | Parse a comma list, each id bounded | 1 |
 | #26 `state.json` trusted for the phase | M1 s2 hand-edited `phase` to `verify`; `phase.py`, `pr.py` read it | Phase comes from the event log; `state.json` keeps only `task_id`, `branch`, `created_at` | 2 |
-| #28 plan rewritten without checks | M1 s2 dropped `## Acceptance checks`; nothing noticed until `pr` | Every `phase` command (except `triage enter`) refuses an unusable `plan.md` | 3 |
-| #41 observed check that needs the PR | E2 C8 ("CI passes on this PR") could not be recorded before `harness pr`; agent had to drop and restore it | Runnable checks gate opening the PR; observational checks gate `ready` | 4 |
+| #28 plan rewritten without checks; #17 headings inside fences | M1 s2 dropped `## Acceptance checks`; a `## ` comment inside a check command splits the plan | Fence-aware parsing; every `phase` command (except `triage enter`) refuses an unusable `plan.md` | 3 |
+| #41 observed check that needs the PR | E2 C8 ("CI passes on this PR") could not be recorded before `harness pr`; agent had to drop and restore it | Runnable checks gate opening the PR; observational checks gate `ready`; after a handoff, work starts with a phase enter; `ready` is revalidated under the spool lock | 4 |
 | P2/W3, #6 PR titles | mvp `main`: `Fix ECH-200: … must emit the (#553)` breaks conventional commits | `harness pr --title`; default cut at a word | 5 |
-| #37 `pr` needs the task id | E4 s2's first `harness pr --refresh` failed on usage | Task id optional, resolved from the branch like `phase`/`check` | 5 |
+| #37 `pr` needs the task id | E4 s2's first `harness pr --refresh` failed on usage | Task id optional, resolved like `phase`/`check` | 5 |
 | Q1, #29/P1 merge rule | User wants agents able to merge when mandated (cloud); mvp's skill says `--auto` | `project.json` `merge: user\|agent`, printed by `harness pr` at `ready` | 5 |
 | #2/P4 pre-push hook runs twice | M3 `ready` push took ~2 min more (preflight again) | The bookkeeping-only second push skips hooks | 5 |
-| #40 clock runs with no agent alive | M1 wall 2.26 h, about 17 min of it worked | The controlling session's end pauses the clock until the task's next `harness` command | 6 |
+| #40 clock runs with no harness-driven agent | M1 wall 2.26 h, about 17 min of it harness-driven work | The controlling session's end pauses the clock until the task's next `harness` command | 6 |
 | #43 agent time drops a span | M3 lost 207 s and its whole triage: a queued message fired a second prompt with no stop | A prompt that arrives before a stop closes the open span at that prompt | 6 |
+| #15 agent time not cut at the clock stop | `timing.agent_time` ignores `until_ms` | Clip spans at the cutoff | 6 |
 | #27 agent works without the harness | M1 s2 carried on after `harness start` was denied | Bootstrap: stop if `harness start` fails in a harness project | 7 |
 | #24 note times made up | 6 of 6 tasks wrote clock times that disagree with events | Notes carry the date only (deletion; no metric reads the time) | 7 |
 | #32 checks pinned to a fixed SHA | prereqs-table C6/C7 broke after `harness pr` rebased | `triage.md`: diff against `git merge-base HEAD <remote>/<branch>` | 7 |
 | #7/#31 S plans have no Decisions | E3 silently turned the requested observed check into a runnable one | S plans may add `## Decisions` | 7 |
-| G1, P1, P7, #42 clashes | superpowers "must use skills"; mvp `--auto`; M3 posted a PR comment | `AGENTS.md`: harness alone plans, opens PRs, sets the merge rule, rebases; write to GitHub only through `harness pr`; never enable auto-merge | 7 |
-| Clash record | User asked that project rules complement the harness | `docs/project-setup.md` in the harness repo (generic) | 8 |
+| G1, P1, P7, #42 clashes | superpowers "must use skills" (potential); mvp `--auto`; M3 posted a PR comment | `AGENTS.md`: the harness alone plans, opens PRs, sets who merges, rebases; GitHub writes only through `harness pr`; never auto-merge | 7 |
+| Clash record (generic half) | User asked that project rules complement the harness | `docs/project-setup.md` in the harness repo | 8 |
 
 ## Deferred (not in this plan), with the reason
 
 | Gap | Why it waits |
 |---|---|
-| #36 conflicts/revisions not recorded | Derivable already: revisions = number of `ready` events; refresh failures = handoff `build exit` after a `ready`. No new event kind |
-| #8 extra review sessions counted | Topology is observe-only (§5.4); count-or-exclude is a scoring decision for Slice 3, not a defect |
-| #38 `harness check` runs any plan command | Inherent: the agent writes its checks and could run the same command through any allowed tool. Documented in `docs/project-setup.md` |
-| #4 rebase-merge with an extra commit passes | Only rebase merges; squash and merge commits are caught. Recorded in `docs/project-setup.md` (prefer squash or merge commits) |
+| #4 rebase-merge with a commit after the last `ready` passes the gate | Detecting it needs the forge's merge commit, and §9.8 keeps scoring forge-free. Squash and merge commits are caught today. The boundary is stated in `docs/project-setup.md` and spec §14 (rebase merges unsupported by the gate) |
+| #36 conflict/revision counts | Diagnostic only, with no consumer before Slice 3. Approximate inputs already exist (`ready` events, handoff exits after a `ready`); Slice 3 defines exact counts |
+| #8 extra review sessions counted | Topology is observe-only (§5.4); count-or-exclude is a Slice 3 scoring decision, not a defect |
+| #38 `harness check` runs any plan command | Inherent: the agent writes its checks and could run the same command through any allowed tool. Stated in `docs/project-setup.md` |
 | #3 `/clear` identity, #20 Codex fixtures, #21 desktop hooks, cloud spool | Slice 2 / later, per the roadmap (§11) |
 | #11/#25 triage depth and tier under-calls | Product decisions about the workflow, not defects |
-| #1, #5, #9, #10, #12–#19, #22, #23, #30, #33, #34, #39, #44 | Low severity, by design, or covered by a fix above (#33 is the gate working; #34/#39 by the `AGENTS.md` lines) |
+| Merge queues with `merge: agent` | `gh pr merge` may enable auto-merge on merge-queue repositories; the agent rule excludes them (stated in the printed rule and spec §14) until a project needs it |
+| #1, #5, #9, #10, #12–#14, #16, #18, #19, #22, #23, #30, #33, #34, #39, #44 | Low severity, by design, or covered by a fix above (#33 is the gate working; #34/#39 by the `AGENTS.md` lines) |
 
 ## Review Focus
 
 1. **A task folder created before this change** (its `state.json` still has `phase`, `phase_open`,
-   `controlling_session`): every command must ignore those keys and use the event log. Pinned by
-   Task 2's hand-edited `state.json` test, which writes exactly those keys.
-2. **A later session that continues an open phase without `phase … enter`** after the controller
-   ended (E2 s1 → s2): the clock must restart at that session's first `harness` command (`resume`).
-   Pinned by Task 6's controller-end test.
+   `controlling_session`): every command ignores those keys and uses the event log. Pinned by Task 2's
+   hand-edited `state.json` test, which writes exactly those keys.
+2. **Successive sessions that each continue an open phase and end without a handoff** (E2 s1 → s2
+   pattern, twice): each end pauses the clock and each session's first `harness` command restarts it.
+   Pinned by Task 6's two-endings test.
 3. **New commits after a PR opened "not ready"**: an observation recorded on an older code tree is
-   stale, so `harness pr` must stay not-ready. Pinned by Task 4's stale-observation assertion.
-4. **An invalid `merge` value in `project.json`** must fail loudly at load, not print a wrong rule.
+   stale, so `harness pr` stays not ready. Pinned by Task 4's stale-observation assertions.
+4. **An invalid `merge` value in `project.json`** fails loudly at load, not with a wrong printed rule.
    Pinned by Task 5's `load_project` test.
-5. **`harness pr --refresh` run by the user with observational checks** must hand control back (exit
-   1, `build exit --handoff`) instead of emitting `ready` or crashing. Pinned by Task 4's refresh test.
+5. **`harness pr --refresh` by the user with observational checks**: hands control back (exit 1,
+   `build exit --handoff`), prints a next step that keeps the record complete, and a later `check`
+   without a phase enter is refused. Pinned by Task 4's refresh test.
 
 ---
 
@@ -109,7 +115,7 @@ Expected: `108 passed`.
 - Test: `tests/test_planfile.py`, `tests/test_gate.py`
 
 **Interfaces:**
-- Produces: `planfile.decision_refs(text: str) -> set[str]` (unchanged signature; now reads lists).
+- Produces: `planfile.decision_refs(text: str) -> set[str]` (same signature; reads lists).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -120,6 +126,12 @@ Append to `PlanfileTest` in `tests/test_planfile.py`:
         extra = ("- 2026-10-09 · claude · build — Rebased C6/C7. Why: main moved. [Check: C6, C7]\n"
                  "- 2026-10-09 · claude · build — Allow versions. Why: #15 merged. Check: C5, goal\n")
         self.assertEqual(planfile.decision_refs(PLAN + extra), {"C3", "C5", "C6", "C7", "goal"})
+
+    def test_decision_refs_need_whole_ids(self):  # gap #35: no partial matches
+        typos = ("- 2026-10-09 · claude · build — Typo. Why: z. Check: goalpost\n"
+                 "- 2026-10-09 · claude · build — Typo. Why: z. Check: C1suffix\n"
+                 "- 2026-10-09 · claude · build — Half. Why: z. Check: C6, C7x\n")
+        self.assertEqual(planfile.decision_refs(PLAN + typos), {"C3", "C6"})
 ```
 
 Append to `GateTest` in `tests/test_gate.py`:
@@ -137,14 +149,15 @@ Append to `GateTest` in `tests/test_gate.py`:
 - [ ] **Step 2: Run them to verify they fail**
 
 Run: `python3 -m pytest -q tests/test_planfile.py tests/test_gate.py`
-Expected: 2 failures (`{"C3", "C5", "C6", "goal"}` missing `C7`; the gate still lists C1).
+Expected: the list test and the gate test fail (`C7` missing; C1 still listed). The whole-ids test may
+already pass; it guards the new regex.
 
 - [ ] **Step 3: Implement**
 
 In `harness/planfile.py` replace line 9 with:
 
 ```python
-_REF = r"(?:C\d+|goal)"
+_REF = r"(?:C\d+|goal)\b"
 DECISION_CHECK_RE = re.compile(rf"\bCheck:\s*({_REF}(?:\s*,\s*{_REF})*)")
 ```
 
@@ -183,8 +196,8 @@ git commit -m "fix(gate): a Decision's Check: may name several checks (#35)"
   `tests/test_pr.py:68` and `:135`
 
 **Interfaces:**
-- Produces: `gate.open_phase(events: list[dict]) -> str | None`: the phase name the task's last phase
-  event left open, in log order; `None` when the last phase event is an exit or there is none.
+- Produces: `gate.open_phase(events: list[dict]) -> str | None`: the phase the task's last phase event
+  left open, in log order; `None` when that event is an exit or there is none.
 - `state.json` written by `start --new` becomes `{"task_id", "branch", "created_at"}`; nothing reads
   phase fields from it.
 - `harness start` (bootstrap) prints a `phase: …` line after the task id.
@@ -224,7 +237,7 @@ In `test_triage_needs_this_sessions_passing_doctor` replace the two `state` line
         self.assertEqual([e["controlling_session"] for e in evs if e["kind"] == "phase"], ["S1"])
 ```
 
-and add `gate` to its import: `from harness import gate, gitio, spool, taskfiles`.
+and change the file's import to `from harness import gate, gitio, spool, taskfiles`.
 
 In `tests/test_start.py`, `StartNewTest.test_registers_the_task_and_starts_the_clock`, replace the
 `state` assertion (lines 33–34) with:
@@ -233,7 +246,7 @@ In `tests/test_start.py`, `StartNewTest.test_registers_the_task_and_starts_the_c
         self.assertEqual(state, {"task_id": task_id, "branch": "t-reg", "created_at": state["created_at"]})
 ```
 
-Append to `BootstrapTest`:
+Append to `BootstrapTest` in `tests/test_start.py`:
 
 ```python
     def test_bootstrap_prints_the_tasks_phase(self):  # gap #26
@@ -243,7 +256,7 @@ Append to `BootstrapTest`:
         self.assertIn("phase: triage (open)", self.sb.harness("start", cwd=wt, env=env).stdout)
 ```
 
-In `tests/test_pr.py` add `from harness import gate` to the imports, add this helper to `PrTest`:
+In `tests/test_pr.py` add `gate` to the `harness` import, add this helper to `PrTest`:
 
 ```python
     def task_events(self, wt, task_id):
@@ -308,8 +321,9 @@ def exit_phase(ctx, task_id: str, name: str, handoff: bool = False) -> None:
 
 
 def _write(ctx, task_id, name, action, handoff) -> None:
+    sid = ctx.identity.session_id  # null for your own manual commands (§6.9)
     context.record(ctx, context.event(ctx, "phase", task_id, phase=name, action=action, handoff=handoff,
-                                      controlling_session=ctx.identity.session_id))  # null for your manual commands (§6.9)
+                                      controlling_session=sid))
 ```
 
 In `harness/commands/pr.py` (`gate` is already imported) replace lines 53–55 with:
@@ -327,7 +341,7 @@ and in `refresh`'s `except HarnessError:` block replace the two `state` lines wi
             phase.exit_phase(ctx, task_id, "build", handoff=True)
 ```
 
-In `harness/commands/start.py`, `new_task`: write `state.json` as
+In `harness/commands/start.py`, add `gate` to the `harness` import; in `new_task` write `state.json` as
 
 ```python
         taskfiles.write_json(folder / "state.json", {
@@ -341,7 +355,7 @@ and in `bootstrap` replace the final `print` with:
           f"harness checkout: {REPO}\nNow read {REPO / 'AGENTS.md'}.")
 ```
 
-adding `gate` to the import line and this helper below `bootstrap`:
+adding this helper below `bootstrap`:
 
 ```python
 def _where(evs: list[dict]) -> str:
@@ -351,8 +365,8 @@ def _where(evs: list[dict]) -> str:
     current = gate.open_phase(evs)
     if current:
         return f"phase: {current} (open)"
-    exits = [e for e in evs if e.get("kind") == "phase"]
-    return f"phase: {exits[-1]['phase']} (exited)" if exits else "phase: none yet"
+    phases = [e for e in evs if e.get("kind") == "phase"]
+    return f"phase: {phases[-1]['phase']} (exited)" if phases else "phase: none yet"
 ```
 
 - [ ] **Step 4: Run the full suite**
@@ -369,20 +383,28 @@ git commit -m "fix(phase): take a task's phase from its event log, never state.j
 
 ---
 
-### Task 3: Phase commands refuse an unusable plan (#28)
+### Task 3: Fence-aware plan parsing; phase commands refuse an unusable plan (#17, #28)
 
 **Files:**
-- Modify: `harness/planfile.py` (add `problems`), `harness/commands/phase.py` (`enter`, `exit_phase`)
+- Modify: `harness/planfile.py` (`_split`, add `_fenced_spans`, add `problems`),
+  `harness/commands/phase.py` (`enter`, `exit_phase`, add `_require_usable_plan`)
 - Test: `tests/test_planfile.py`, `tests/test_phase.py`
 
 **Interfaces:**
 - Produces: `planfile.problems(text: str, tier: str | None = None) -> list[str]` (empty when usable).
+- `planfile.sections` and `planfile.checks` ignore heading-shaped lines inside triple-backtick fences.
 
 - [ ] **Step 1: Write the failing tests**
 
 Append to `PlanfileTest` in `tests/test_planfile.py`:
 
 ```python
+    def test_headings_inside_a_fence_are_command_text(self):  # gap #17
+        plan = PLAN.replace("grep -q hi greeting.txt\n", "## look for hi\ngrep -q hi greeting.txt\n")
+        self.assertEqual(planfile.checks(plan)["C1"].command, "## look for hi\ngrep -q hi greeting.txt\n")
+        self.assertEqual(list(planfile.checks(plan)), ["C1", "C2"])
+        self.assertEqual(planfile.problems(plan, "M"), [])
+
     def test_problems(self):  # gap #28
         self.assertEqual(planfile.problems(PLAN, "M"), [])
         no_checks = PLAN[:PLAN.index("### C1")] + PLAN[PLAN.index("## Tier"):]
@@ -409,11 +431,42 @@ Append to `PhaseTest` in `tests/test_phase.py`:
 - [ ] **Step 2: Run them to verify they fail**
 
 Run: `python3 -m pytest -q tests/test_planfile.py tests/test_phase.py`
-Expected: `problems` missing; `build enter` succeeds (exit 0).
+Expected: the fence test fails (C1's command is cut at the `## ` line), `problems` is missing, and
+`build enter` succeeds (exit 0).
 
 - [ ] **Step 3: Implement**
 
-Add to `harness/planfile.py` after `checks`:
+In `harness/planfile.py` add above `_split`:
+
+```python
+FENCE_LINE_RE = re.compile(r"^```", re.M)
+
+
+def _fenced_spans(text: str) -> list[tuple[int, int]]:
+    """Character spans of triple-backtick fenced blocks; an unclosed fence runs to the end (gap #17)."""
+    spans, opened = [], None
+    for m in FENCE_LINE_RE.finditer(text):
+        if opened is None:
+            opened = m.start()
+        else:
+            spans.append((opened, m.end()))
+            opened = None
+    if opened is not None:
+        spans.append((opened, len(text)))
+    return spans
+```
+
+and replace `_split` with:
+
+```python
+def _split(text: str, pattern: re.Pattern) -> list[tuple[re.Match, str]]:
+    fenced = _fenced_spans(text)
+    matches = [m for m in pattern.finditer(text) if not any(a <= m.start() < b for a, b in fenced)]
+    return [(m, text[m.start(): matches[i + 1].start() if i + 1 < len(matches) else len(text)])
+            for i, m in enumerate(matches)]
+```
+
+Add after `checks`:
 
 ```python
 def problems(text: str, tier: str | None = None) -> list[str]:
@@ -444,22 +497,22 @@ def _require_usable_plan(folder) -> None:
         raise HarnessError("fix plan.md first:\n" + "\n".join(f"- {p}" for p in found))
 ```
 
-Call it before any write: in `enter`, right after computing `current`, add
-`if name != "triage": _require_usable_plan(folder)` and delete the now-redundant two lines
-`if snapshot and not (folder / "plan.md").exists(): raise …`; in `exit_phase`, right after the
+Call it before any write. In `enter`: delete the two lines
+`if snapshot and not (folder / "plan.md").exists(): raise …` and, right after computing `current`, add
+`if name != "triage": _require_usable_plan(folder)`. In `exit_phase`: right after the
 `current != name` refusal, add `_require_usable_plan(folder)`.
 
 - [ ] **Step 4: Run the full suite**
 
 Run: `python3 -m pytest -q`
-Expected: all pass. If an existing test enters a later phase without a plan, it was relying on the
+Expected: all pass. If an existing test enters a later phase without a usable plan, it relied on the
 gap; give it a plan with `write_plan` rather than weakening the check.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add harness tests
-git commit -m "fix(phase): refuse a plan.md without a goal or usable checks (#28)"
+git commit -m "fix(plan): fence-aware parsing; phase commands refuse an unusable plan.md (#17, #28)"
 ```
 
 ---
@@ -467,19 +520,34 @@ git commit -m "fix(phase): refuse a plan.md without a goal or usable checks (#28
 ### Task 4: Runnable checks gate the PR; observational checks gate `ready` (#41)
 
 **Files:**
-- Modify: `harness/gate.py` (`unmet_checks`, `failing_checks`), `harness/commands/pr.py`
-  (`pr_body`, `publish`, `refresh`, `run`)
-- Test: `tests/test_pr.py`
+- Modify: `harness/gate.py` (`unmet_checks`, `failing_checks`, `needs_phase_enter`),
+  `harness/commands/check.py:25-26`, `harness/commands/pr.py` (`pr_body`, `publish`, `refresh`, `run`)
+- Test: `tests/test_pr.py`, `tests/test_gate.py`
 
 **Interfaces:**
 - Produces: `gate.unmet_checks(plan_text, events, code_tree, before_ts=None) -> dict[str, str]`
   (check id → reason); `gate.failing_checks(...)` keeps its signature and output.
-- `pr.publish(ctx, project, task_id) -> str` returns `"ready"` or `"pending"`.
+- Produces: `gate.needs_phase_enter(events) -> str | None`: why the next `check` or `pr` must wait for
+  a phase enter (after `ready`: `build enter`, R-5; after a handoff exit: a phase enter), else None.
+- `pr.publish(ctx, project, task_id) -> tuple[str, ...]`: the observational check ids still owed;
+  `()` means `ready` was emitted.
 - `pr.pr_body(task_id, plan, scope, pending=()) -> str`.
 
 - [ ] **Step 1: Write the failing tests**
 
-Add to `PrTest` in `tests/test_pr.py`:
+Append to `GateTest` in `tests/test_gate.py`:
+
+```python
+    def test_needs_phase_enter_after_ready_or_a_handoff_exit(self):  # R-5, gap #41
+        self.assertIsNone(gate.needs_phase_enter([]))
+        self.assertIn("build enter", gate.needs_phase_enter([ev("ready", 1)]))
+        handoff = ev("phase", 2, phase="build", action="exit", handoff=True)
+        self.assertIn("handoff", gate.needs_phase_enter([handoff]))
+        self.assertIsNone(gate.needs_phase_enter([handoff, ev("phase", 3, phase="build", action="enter")]))
+```
+
+Add `import sys` and `from pathlib import Path` to the imports of `tests/test_pr.py`, add `REPO` and
+`spool` to the `harness` import, and add to `PrTest`:
 
 ```python
     def observed_task(self, slug):
@@ -493,19 +561,20 @@ Add to `PrTest` in `tests/test_pr.py`:
         self.assertEqual(self.h(wt, env, "check", "--all").returncode, 0)
         return wt, env, task_id
 
-    def test_observational_checks_wait_for_the_open_pr(self):  # gap #41
+    def test_observational_checks_wait_for_the_open_pr(self):  # gap #41, Review Focus 3
         wt, env, task_id = self.observed_task("pr-observe")
         creates = self.gh_log().count("pr create")
         r = self.h(wt, env, "pr", task_id)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("not ready", r.stdout)
+        self.assertIn("run `harness pr` again", r.stdout)
         self.assertEqual(self.gh_log().count("pr create"), creates + 1)
         self.assertIn("Waiting for observation: C2", self.gh_log())
         kinds = [k for k, _, _ in self.kinds(wt, task_id)]
         self.assertIn("pr", kinds)
         self.assertNotIn("ready", kinds)
         self.assertEqual(gate.open_phase(self.task_events(wt, task_id)), "verify")
-        (wt / "late.txt").write_text("late\n")          # Review Focus 3: an old observation goes stale
+        (wt / "late.txt").write_text("late\n")          # an observation on an older tree goes stale
         commit(wt, "late change")
         self.h(wt, env, "check", "C1")
         self.h(wt, env, "check", "C2", "--observed", "pass")
@@ -530,20 +599,61 @@ Add to `PrTest` in `tests/test_pr.py`:
         r = self.h(wt, {}, "pr", "--refresh", task_id)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("not ready", r.stdout)
+        self.assertIn("harness phase build enter", r.stdout)
         evs = self.sb.task_file_events(wt, task_id)
         last = [e for e in evs if e["kind"] == "phase"][-1]
         self.assertEqual((last["phase"], last["action"], last["handoff"]), ("build", "exit", True))
         self.assertEqual(sum(e["kind"] == "ready" for e in evs), 1)
+        self.assertIn("handoff", self.h(wt, env, "check", "C2", "--observed", "pass").stderr)
+        self.h(wt, env, "phase", "build", "enter")
+        self.assertEqual(self.h(wt, env, "check", "C2", "--observed", "pass").returncode, 0)
+        self.assertIn("ready:", self.h(wt, env, "pr", task_id).stdout)
+
+    def test_a_check_that_fails_while_the_pr_opens_blocks_ready(self):  # ready revalidated under the lock
+        wt, env, task_id = self.built("pr-race")
+        spool_file = spool.project_dir(self.sb.env, gitio.info(wt).common_dir) / "spool.jsonl"
+        script = self.sb.tmp / "late_fail.py"
+        script.write_text(
+            "import sys\n"
+            f"sys.path.insert(0, {str(REPO)!r})\n"
+            "from harness import events\n"
+            f"with open({str(spool_file)!r}, 'a') as f:\n"
+            f"    f.write(events.dumps(events.make('check', 'cli', events.now_ts(), task_id={task_id!r}, "
+            "check_id='C1', result='fail')))\n")
+        hook = Path(gitio.info(wt).common_dir) / "hooks" / "pre-push"
+        hook.write_text(f"#!/bin/sh\n{sys.executable} {script}\n")
+        hook.chmod(0o755)
+        self.addCleanup(hook.unlink)
+        r = self.h(wt, env, "pr", task_id)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("changed while the PR was opening", r.stderr)
+        self.assertNotIn("ready", [k for k, _, _ in self.kinds(wt, task_id)])
 ```
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `python3 -m pytest -q tests/test_pr.py`
-Expected: both new tests fail (`pr` refuses with "C2: no recorded attempt").
+Run: `python3 -m pytest -q tests/test_gate.py tests/test_pr.py`
+Expected: the four new tests fail (`needs_phase_enter` missing; `pr` refuses with "C2: no recorded
+attempt"; `ready` is emitted despite the late failure).
 
-- [ ] **Step 3: Implement `gate.unmet_checks`**
+- [ ] **Step 3: Implement in `harness/gate.py`**
 
-Replace `failing_checks` in `harness/gate.py` with:
+Add after `needs_build_enter`:
+
+```python
+def needs_phase_enter(events: list[dict]) -> str | None:
+    """Why the next check or PR must wait for a phase enter, or None. After `ready`, any further change
+    starts with `build enter` (R-5); after a handoff exit, the successor first enters a phase, so its
+    time is charged (gap #41)."""
+    if needs_build_enter(events):
+        return "after `ready`, run `harness phase build enter` first"
+    phases = _of(events, "phase")
+    if phases and phases[-1].get("action") == "exit" and phases[-1].get("handoff"):
+        return f"a handoff closed {phases[-1].get('phase')}: run `harness phase build enter` first"
+    return None
+```
+
+Replace `failing_checks` with:
 
 ```python
 def unmet_checks(plan_text: str, events: list[dict], code_tree: str | None,
@@ -574,9 +684,19 @@ def failing_checks(plan_text: str, events: list[dict], code_tree: str | None, be
     return [f"{cid}: {why}" for cid, why in unmet_checks(plan_text, events, code_tree, before_ts).items()]
 ```
 
-- [ ] **Step 4: Implement the pending path in `harness/commands/pr.py`**
+- [ ] **Step 4: Use it in `harness/commands/check.py`**
 
-Replace `pr_body`, `publish` and `refresh`, and make `run` return 0 for both publish outcomes:
+Replace lines 25–26 with:
+
+```python
+    blocked = gate.needs_phase_enter(context.task_events(ctx, task_id))
+    if blocked:
+        raise HarnessError(blocked)
+```
+
+- [ ] **Step 5: Implement the pending path in `harness/commands/pr.py`**
+
+Add `spool` to the `harness` import. Replace `pr_body`, `publish`, `refresh` and the end of `run`:
 
 ```python
 def pr_body(task_id: str, plan: str, scope: tuple[str, ...], pending: tuple[str, ...] = ()) -> str:
@@ -592,15 +712,16 @@ def pr_body(task_id: str, plan: str, scope: tuple[str, ...], pending: tuple[str,
     return "\n".join(lines) + "\n"
 
 
-def publish(ctx, project: dict, task_id: str) -> str:
-    """Open or update the PR. Runnable checks must pass first; observational checks still unrecorded
-    at this code tree leave it open without `ready` (gap #41). Returns "ready" or "pending"."""
+def publish(ctx, project: dict, task_id: str) -> tuple[str, ...]:
+    """Open or update the PR. Runnable checks must pass first; observational checks not yet passed at
+    this code tree leave it open without `ready` (gap #41). Returns those check ids; () = ready."""
     folder = taskfiles.task_dir(ctx.root, task_id)
     evs = context.task_events(ctx, task_id)
     if not any(e.get("kind") == "phase" and e.get("phase") == "triage" and e.get("action") == "enter" for e in evs):
         raise HarnessError("no `harness phase triage enter` recorded for this task")
-    if gate.needs_build_enter(evs):
-        raise HarnessError("after `ready`, run `harness phase build enter` before `harness pr`")
+    blocked = gate.needs_phase_enter(evs)
+    if blocked:
+        raise HarnessError(blocked)
     dirty = gitio.dirty_outside_harness(ctx.root)
     if dirty:
         raise HarnessError("commit your changes first:\n" + "\n".join(dirty))
@@ -634,19 +755,25 @@ def publish(ctx, project: dict, task_id: str) -> str:
     if pending:
         gitio.commit_paths(ctx.root, ".harness", f"harness: pr {task_id}")
         gitio.push(ctx.root, remote, branch)
-        names = " ".join(pending)
-        print(f"pr open: {url}\nnot ready: observe {names} on the open PR, record each with "
-              f"`harness check <C-id> --observed pass|fail`, then run `harness pr {task_id}` again.")
-        return "pending"
+        print(f"pr open: {url}\nnot ready: waiting for observation of {', '.join(pending)}.")
+        return pending
     tip = gitio.out(["rev-parse", "HEAD"], ctx.root)
-    context.record(ctx, context.event(ctx, "ready", task_id, tip_commit=tip, code_tree=tree))
+    with spool.locked(ctx.state_dir):  # no check can land between this read and `ready`
+        late = gate.failing_checks(plan, context.task_events(ctx, task_id), tree)
+        if late:
+            raise HarnessError("a check changed while the PR was opening; run `harness pr` again:\n"
+                               + "\n".join(late))
+        context.record(ctx, context.event(ctx, "ready", task_id, tip_commit=tip, code_tree=tree), held=True)
     gitio.commit_paths(ctx.root, ".harness", f"harness: ready {task_id}")
     try:
         gitio.push(ctx.root, remote, branch)
     except HarnessError as e:
         raise HarnessError(f"{e}\n`ready` is recorded; finish with `git push {remote} HEAD`") from e
     print(f"ready: {url}")
-    return "ready"
+    return ()
+
+
+HAND_BACK = "Next, a session in this worktree runs `harness phase build enter`, {fix}, then `harness pr`."
 
 
 def refresh(ctx, project: dict, task_id: str) -> int:
@@ -655,17 +782,19 @@ def refresh(ctx, project: dict, task_id: str) -> int:
         if rebase.rebase(ctx, project) == "conflict":
             rebase.abort(ctx)
             phase.exit_phase(ctx, task_id, "build", handoff=True)  # control returns to you (R-1)
-            print("rebase conflict: aborted. A session in this worktree resolves it with `harness rebase`, "
-                  "then runs `harness pr`.")
+            print("rebase conflict: aborted. " + HAND_BACK.format(
+                fix="resolves it with `harness rebase`, runs `harness check --all`"))
             return 1
         plan = (taskfiles.task_dir(ctx.root, task_id) / "plan.md").read_text()
         results = [check.run_one(ctx, task_id, c) for c in planfile.checks(plan).values() if c.command]
         if "fail" in results:
             phase.exit_phase(ctx, task_id, "build", handoff=True)
-            print("checks fail at the rebased code: a session in this worktree fixes them, then runs `harness pr`.")
+            print("checks fail at the rebased code. " + HAND_BACK.format(fix="fixes and rechecks them"))
             return 1
-        if publish(ctx, project, task_id) == "pending":
+        pending = publish(ctx, project, task_id)
+        if pending:
             phase.exit_phase(ctx, task_id, "build", handoff=True)  # observations are owed at the new code
+            print(HAND_BACK.format(fix="records each with `harness check <C-id> --observed pass|fail`"))
             return 1
         return 0
     except HarnessError:
@@ -680,20 +809,23 @@ In `run`, replace the last line with:
 ```python
     if args.refresh:
         return refresh(ctx, project, args.task_id)
-    publish(ctx, project, args.task_id)
+    if publish(ctx, project, args.task_id):
+        print("Next: observe them on the open PR, record each with "
+              "`harness check <C-id> --observed pass|fail`, then run `harness pr` again.")
     return 0
 ```
 
-Note the `pr` event is now recorded right after `pr_create` (before `ready`); update
+The `pr` event is now recorded right after `pr_create` (before `ready`); update
 `test_publish_pushes_opens_one_pr_and_records_ready` to expect the last three kinds as
-`[("phase", "verify", "exit"), ("pr", None, None), ("ready", None, None)]`.
+`[("phase", "verify", "exit"), ("pr", None, None), ("ready", None, None)]`. `test_check.py`'s
+`test_after_ready_checks_need_a_build_enter` keeps passing ("build enter" is in the new message).
 
-- [ ] **Step 5: Run the full suite**
+- [ ] **Step 6: Run the full suite**
 
 Run: `python3 -m pytest -q`
 Expected: all pass.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add harness tests
@@ -705,9 +837,9 @@ git commit -m "feat(pr): open the PR before observational checks; ready waits fo
 ### Task 5: PR title, optional task id, merge rule, one hooked push (P2, #37, Q1, #2)
 
 **Files:**
-- Modify: `harness/commands/pr.py` (`add_args`, `run`, `title`, `publish`), `harness/ghio.py`
-  (`pr_edit_body` → `pr_edit`), `harness/gitio.py` (`push`), `harness/taskfiles.py` (`load_project`),
-  `harness/commands/install.py` (`PROJECT_DEFAULTS`)
+- Modify: `harness/commands/pr.py` (`add_args`, `run`, `title`, `publish`, add `merge_rule`),
+  `harness/ghio.py` (`pr_edit_body` → `pr_edit`), `harness/gitio.py` (`push`), `harness/taskfiles.py`
+  (`load_project`), `harness/commands/install.py` (`PROJECT_DEFAULTS`)
 - Test: `tests/test_pr.py`, `tests/test_taskfiles.py`
 
 **Interfaces:**
@@ -720,8 +852,7 @@ git commit -m "feat(pr): open the PR before observational checks; ready waits fo
 
 - [ ] **Step 1: Write the failing tests**
 
-Add `from pathlib import Path` and `from harness.commands import pr` to the imports at the top of
-`tests/test_pr.py`, and append:
+Add `from harness.commands import pr` to the imports of `tests/test_pr.py` and append:
 
 ```python
 class PrUnitTest(unittest.TestCase):
@@ -737,20 +868,22 @@ class PrUnitTest(unittest.TestCase):
         rule = pr.merge_rule({"merge": "agent"}, "t1", 7)
         self.assertIn("harness pr --refresh t1", rule)
         self.assertIn("gh pr merge 7 --match-head-commit", rule)
+        self.assertIn("merge queue", rule)
         self.assertIn("Never enable auto-merge", rule)
 ```
 
 Add to `PrTest`:
 
 ```python
-    def test_title_flag_task_id_from_branch_and_one_hooked_push(self):  # P2, #37, #2
+    def test_title_flag_task_id_from_the_branch_and_one_hooked_push(self):  # P2, #37, #2
         wt, env, task_id = self.built("pr-title")
         hook = Path(gitio.info(wt).common_dir) / "hooks" / "pre-push"
         log = self.sb.tmp / "pre-push.log"
         hook.write_text(f"#!/bin/sh\necho push >> {log}\n")
         hook.chmod(0o755)
         self.addCleanup(hook.unlink)
-        r = self.h(wt, env, "pr", "--title", "feat: add a greeting")
+        no_task_var = {k: v for k, v in env.items() if k != "HARNESS_TASK_ID"}
+        r = self.h(wt, no_task_var, "pr", "--title", "feat: add a greeting")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("--title feat: add a greeting", self.gh_log())
         self.assertIn("the user merges", r.stdout)
@@ -803,17 +936,15 @@ def pr_edit(cwd, number: int, body: str, title: str | None = None) -> None:
 
 `harness/commands/install.py` — add `"merge": "user",` to `PROJECT_DEFAULTS` after `"cloud_env_vars"`.
 
-`harness/commands/pr.py`:
+`harness/commands/pr.py` — add `import textwrap` at the top, and:
 
 ```python
-import textwrap
-
 MERGE_RULES = {
     "user": "Merge: the user merges this PR after `harness pr --refresh {task_id}`; do not merge it "
             "or enable auto-merge.",
     "agent": "Merge: run `harness pr --refresh {task_id}`; when it prints ready, merge with "
              "`gh pr merge {number} --match-head-commit <the head it prints>` and the project's merge "
-             "method. Never enable auto-merge.",
+             "method (not in a repository that uses a merge queue). Never enable auto-merge.",
 }
 
 
@@ -833,7 +964,9 @@ def run(args, ctx) -> int:
         raise HarnessError("run `harness pr` on the task's branch")
     if args.refresh:
         return refresh(ctx, project, task_id)
-    publish(ctx, project, task_id, args.title)
+    if publish(ctx, project, task_id, args.title):
+        print("Next: observe them on the open PR, record each with "
+              "`harness check <C-id> --observed pass|fail`, then run `harness pr` again.")
     return 0
 
 
@@ -867,7 +1000,7 @@ pass `verify=False` to the two bookkeeping pushes (the `harness: pr` push in the
     print(f"ready: {url} (head {head})\n{merge_rule(project, task_id, number)}")
 ```
 
-`refresh` calls `publish(ctx, project, task_id)` (no title: a refresh keeps the existing one).
+`refresh` keeps calling `publish(ctx, project, task_id)` (no title: a refresh keeps the existing one).
 
 - [ ] **Step 4: Run the full suite**
 
@@ -883,28 +1016,36 @@ git commit -m "feat(pr): --title, task id from the branch, printed merge rule, o
 
 ---
 
-### Task 6: Wall time pauses when the controller ends; mid-turn prompts keep agent time (#40, #43)
+### Task 6: Wall time pauses when the controller ends; agent time keeps mid-turn prompts and stops at the cutoff (#40, #43, #15)
 
 **Files:**
 - Modify: `harness/timing.py` (`charged_intervals`, `agent_time`)
 - Test: `tests/test_timing.py`
 
-**Interfaces:** unchanged signatures (`timing.wall`, `timing.agent_time`).
+**Interfaces:** unchanged signatures (`timing.wall`, `timing.agent_time`). For timing, the controlling
+session is the session of the latest phase enter or `resume` (a `harness start`) that names one.
 
 - [ ] **Step 1: Write the failing tests**
 
 Append to `WallTest` in `tests/test_timing.py`:
 
 ```python
-    def test_controller_session_end_pauses_until_the_next_harness_command(self):  # gap #40, Review Focus 2
+    def test_controller_session_end_pauses_until_the_next_harness_command(self):  # gap #40
         w = self.wall([ev("start", 0), ph(1, "verify", "enter"),
                        hook("session_end", 10),                       # S1 ends inside verify, no handoff
-                       hook("session_start", 50, session="S2"),
+                       hook("session_start", 50, session="S2"),       # hooks alone do not restart it
                        ev("resume", 52, session_id="S2"),             # S2's `harness start`
                        ph(59, "verify", "exit", session="S2"), ev("ready", 60)])
         self.assertEqual(w.total_ms, (10 + 8) * MIN)
         self.assertEqual(w.by_phase, {"between_phases": 2 * MIN, "verify": 16 * MIN})
         self.assertTrue(w.complete)
+
+    def test_each_successor_that_ends_without_handoff_pauses_too(self):  # gap #40, Review Focus 2
+        w = self.wall([ev("start", 0), ph(1, "verify", "enter"), hook("session_end", 10),
+                       ev("resume", 50, session_id="S2"), hook("session_end", 60, session="S2"),
+                       ev("resume", 200, session_id="S3"), ph(209, "verify", "exit", session="S3"),
+                       ev("ready", 210)])
+        self.assertEqual(w.total_ms, (10 + 10 + 10) * MIN)
 
     def test_another_sessions_end_does_not_pause(self):  # gap #40 (review sessions, delegates)
         w = self.wall([ev("start", 0), ph(1, "build", "enter"), hook("session_end", 5, session="REVIEW"),
@@ -912,8 +1053,8 @@ Append to `WallTest` in `tests/test_timing.py`:
         self.assertEqual(w.total_ms, 30 * MIN)
 ```
 
-In `AgentTimeTest.test_prompt_to_last_stop_per_session_plus_helpers` change the comment on S2's line
-to `# first span: closed by the second prompt` and the assertions to:
+In `AgentTimeTest.test_prompt_to_last_stop_per_session_plus_helpers` change the comment on S2's line to
+`# first span: closed by the second prompt` and the assertions to:
 
 ```python
         self.assertEqual(a.total_ms, (8 + 2 + 4 + 2) * MIN)  # S2's first turn ran until its second prompt
@@ -921,10 +1062,20 @@ to `# first span: closed by the second prompt` and the assertions to:
         self.assertEqual(a.by_phase, {"build": 16 * MIN})
 ```
 
+and append to `AgentTimeTest`:
+
+```python
+    def test_spans_stop_at_the_cutoff(self):  # gap #15
+        evs = [hook("prompt", 0), hook("stop", 10), hook("prompt", 20), hook("stop", 30), hook("prompt", 40),
+               hook("stop", 50)]
+        self.assertEqual(timing.agent_time(evs, BASE + 25 * MIN).total_ms, (10 + 5) * MIN)
+```
+
 - [ ] **Step 2: Run them to verify they fail**
 
 Run: `python3 -m pytest -q tests/test_timing.py`
-Expected: 3 failures (wall 59 min instead of 18; agent time 14 instead of 16).
+Expected: 4 failures (the two pause tests charge idle time; the agent-time tests get 14 and 30
+minutes); the other-session test already passes and guards the rule's scope.
 
 - [ ] **Step 3: Implement**
 
@@ -933,15 +1084,15 @@ Replace `charged_intervals` in `harness/timing.py`:
 ```python
 def charged_intervals(events: list[dict], until_ms: int) -> tuple[list[tuple[int, int]], list[str]]:
     """Spans the wall clock runs. `ready`, a handoff exit and an abandon pause it; a later revision
-    restarts at its resume or build enter (R-2). The controlling session's end also pauses it (no
-    agent is left working), and the task's next `harness` command restarts it (gap #40)."""
+    restarts at its resume or build enter (R-2). The controlling session's end also pauses it, and the
+    task's next `harness` command restarts it (gap #40). The controlling session is the one of the
+    latest phase enter or `resume` that names a session."""
     intervals, missing = [], []
     started, running, since, resumes = False, False, 0, {}
     controller, ended = None, False
     for e in events:
         kind, t = e.get("kind"), ts_ms(e["ts"])
-        if kind == "phase" and e.get("action") == "enter":
-            controller = e.get("controlling_session")
+        enter = kind == "phase" and e.get("action") == "enter"
         if kind == "start":
             started, running, since = True, True, t
             continue
@@ -960,9 +1111,14 @@ def charged_intervals(events: list[dict], until_ms: int) -> tuple[list[tuple[int
             running, resumes, ended = False, {}, True
         elif kind == "resume" and not running:
             resumes[e.get("session_id")] = t  # the latest resume per session
-        elif kind == "phase" and e.get("action") == "enter" and not running:
-            since = resumes.get(controller, t) if controller else t  # R-2
+        elif enter and not running:
+            sid = e.get("controlling_session")
+            since = resumes.get(sid, t) if sid else t  # R-2
             running = True
+        if enter and e.get("controlling_session"):
+            controller = e["controlling_session"]
+        elif kind == "resume" and e.get("session_id"):
+            controller = e["session_id"]
     if not started:
         missing.append("no start event")
     elif running:
@@ -981,22 +1137,28 @@ In `agent_time`, replace the `if kind in ("prompt", "session_end"):` branch with
                 prompt_t, stop_t = (ts_ms(e["ts"]), None) if kind == "prompt" else (None, None)
 ```
 
-and update its docstring to: `"""Per session: prompt → last stop before the next prompt or session
-end (a prompt that arrives before any stop closes the open span at that prompt); plus helper start →
-stop."""`
+just before `by_phase = split_by_phase(...)` add:
+
+```python
+    spans = [(a, min(b, until_ms)) for a, b in spans if a < until_ms]  # nothing after the clock stops (gap #15)
+```
+
+and update its docstring to: `"""Per session: prompt → last stop before the next prompt or session end
+(a prompt that arrives before any stop closes the open span at that prompt); plus helper start → stop;
+all cut at until_ms."""`
 
 - [ ] **Step 4: Run the full suite**
 
 Run: `python3 -m pytest -q`
-Expected: all pass. (`test_e2e` and `test_score` cards that end their sessions after `ready` are
-unaffected; if one changes, check its controller ended before `ready` and update the expectation with
-a comment naming gap #40.)
+Expected: all pass. (`test_e2e`/`test_score`/`test_scorecard` end their sessions after `ready`; if a
+card changes, confirm its controller ended before `ready` and update the expectation with a comment
+naming gap #40.)
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add harness/timing.py tests/test_timing.py
-git commit -m "fix(timing): pause on the controller's end; keep agent time across mid-turn prompts (#40, #43)"
+git commit -m "fix(timing): pause on the controller's end; keep mid-turn prompts; cut at the stop (#40, #43, #15)"
 ```
 
 ---
@@ -1006,28 +1168,17 @@ git commit -m "fix(timing): pause on the controller's end; keep agent time acros
 **Files:**
 - Modify: `hooks/bootstrap.md`, `AGENTS.md`, `skills/phases/triage.md`, `skills/phases/build.md`,
   `skills/phases/verify.md`
-- Test: `tests/test_instructions.py`
 
-- [ ] **Step 1: Write the failing test**
+No new test: `tests/test_instructions.py` already checks every named command exists; Task 5 tests the
+title behavior.
 
-Append to `InstructionsTest`:
-
-```python
-    def test_pr_lines_give_a_title(self):  # clash P2
-        for path in (REPO / "AGENTS.md", PHASE_DIR / "build.md", PHASE_DIR / "verify.md"):
-            for line in re.findall(r"`harness pr <task-id>[^`]*`", path.read_text()):
-                self.assertIn("--title", line, f"{path.name}: {line}")
-```
-
-Run: `python3 -m pytest -q tests/test_instructions.py` — expected: FAIL.
-
-- [ ] **Step 2: Rewrite `hooks/bootstrap.md`** (one line, kept as one paragraph):
+- [ ] **Step 1: Rewrite `hooks/bootstrap.md`** (one paragraph):
 
 ```
 If another agent launched you, ignore this file and follow your prompt. Otherwise run `harness start`, then read `AGENTS.md` from the checkout it prints. If `harness start` fails or is refused in a repository that has `.harness/project.json`, stop and tell the user: never work on a harness task without it.
 ```
 
-- [ ] **Step 3: Edit `AGENTS.md`**
+- [ ] **Step 2: Edit `AGENTS.md`**
 
 - First paragraph: "`harness start` sent you here and printed the task id and its phase."
 - "Order" paragraph: replace "If `.harness/runs/<task-id>/state.json` already names a `phase`" with
@@ -1056,7 +1207,7 @@ If another agent launched you, ignore this file and follow your prompt. Otherwis
 - Write to GitHub only through `harness pr` and the merge rule it prints: no PR comments or edits.
 ```
 
-- [ ] **Step 4: Edit the phase files**
+- [ ] **Step 3: Edit the phase files**
 
 `skills/phases/triage.md`:
 - Step 2, after the sentence listing the M/L sections, add: "S plans add `## Decisions` when there is
@@ -1065,22 +1216,29 @@ If another agent launched you, ignore this file and follow your prompt. Otherwis
   diffs against `$(git merge-base HEAD <remote>/<branch>)`: the branch moves while the task runs, so
   never use a fixed commit or the branch tip."
 
-`skills/phases/build.md`: in the **Commands** line and step 7, write
-`harness pr <task-id> --title "<title>"`.
+`skills/phases/build.md`:
+- **Commands** line and step 7: write `harness pr <task-id> --title "<title>"`.
+- Last paragraph: "After `ready`, or after a handoff, any edit, rebase or check starts with
+  `harness phase build enter`. Running `harness pr` again re-emits `ready` without opening a second PR."
 
-`skills/phases/verify.md`: in the **Commands** line and step 5 write
-`harness pr <task-id> --title "<title>"`; append to step 3: "One that needs the open PR (for example
-its CI) is recorded after `harness pr` opens it (see `AGENTS.md` item 3)."
+`skills/phases/verify.md`:
+- **Commands** line: replace `harness phase verify exit`, `harness pr <task-id>` with
+  `harness pr <task-id> --title "<title>"` (it exits verify when it emits `ready`).
+- Append to step 3: "One that needs the open PR (for example its CI) is recorded after `harness pr`
+  opens it."
+- Replace step 5 with: "5. Verify ends when every check that can pass before the PR has passed. Run
+  `harness pr <task-id> --title "<title>"`; it closes verify when it prints `ready`. If it prints
+  `not ready`, follow `AGENTS.md` item 3."
 
-- [ ] **Step 5: Run the full suite**
+- [ ] **Step 4: Run the full suite**
 
 Run: `python3 -m pytest -q`
 Expected: all pass.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add AGENTS.md hooks/bootstrap.md skills tests/test_instructions.py
+git add AGENTS.md hooks/bootstrap.md skills
 git commit -m "docs(instructions): stop without the harness, date-only notes, PR titles, task ownership"
 ```
 
@@ -1109,8 +1267,9 @@ The harness is generic. A project's own agent rules should complement it, not re
 
 - **Merge rule:** `.harness/project.json` `merge` is `"user"` (default) or `"agent"`. `harness pr`
   prints the rule at `ready`. With `agent`, the agent runs `harness pr --refresh` and merges with
-  `gh pr merge --match-head-commit`, never auto-merge. Prefer squash or merge commits: the done gate
-  cannot see a commit added to a rebase merge after the last `ready`.
+  `gh pr merge --match-head-commit`, never auto-merge; not for repositories with a merge queue.
+- **Merge method:** squash or merge commits. The done gate cannot see a commit added to a rebase merge
+  after the last `ready`.
 - **Project instructions** that prescribe planning, opening or merging PRs, rebasing or worktrees: add
   "In a harness task, follow the harness for these; everything else here still applies."
 - **Permissions:** match the merge rule. With `user`, deny task agents `gh pr merge` and `gh api`;
@@ -1147,21 +1306,21 @@ for p in echo-wiki mvp; do
 done
 ```
 
-Run from the `v0-hardening` checkout (adjust the `cli.py` path if implementing in a worktree). Compare
-each new card with its copy under `~/.local/state/harness/<hash>/scorecards/`. Expected changes, and
-only these:
+Run with the `v0-hardening` code (adjust the `cli.py` path if implementing in a worktree). Compare each
+new card with its copy under `~/.local/state/harness/<hash>/scorecards/`. Expected changes (wall values
+from round-1 review runs of this plan's timing code over both spools):
 
 | Task | Field | Before | Expected after | Rule |
 |---|---|---|---|---|
 | prereqs-table | `done`, gate reasons | false, "C7 changed … without a Decision" | true, none | #35 |
-| journey-fixture-prettier (M1) | `wall.total_ms` | 8125823 | ≈ 998000 (14:32:22.5→14:39:58, then 16:38:45→16:47:48) | #40 |
-| ech-171-parity (M3) | `agent_time.by_phase.triage`, `unknown_spans` | absent, 1 | present, 0 | #43 |
-| echo-wiki-ci (E2) | `wall.total_ms` | 1409482 | ≈ 1363000 (s1 ended 17:15:14 inside verify; s2 resumed 17:16:00) | #40 |
-| any card | `agent_time` | — | may rise where a session had back-to-back prompts | #43 |
+| journey-fixture-prettier (M1) | `wall.total_ms` | 8125823 | 998167 | #40 |
+| echo-wiki-ci (E2) | `wall.total_ms` | 1409482 | 1363985 | #40 |
+| validate-json (E1) | `wall.total_ms` | 2097662 | 2076214 | #40 |
+| ech-171-parity (M3) | `agent_time.by_phase.triage`, `unknown_spans` | absent, 1 | present, 0 (total +207 s) | #43 |
+| any card | `agent_time` | — | may change where a session had a prompt before any stop (#43) or activity after the cutoff (#15) | #43, #15 |
 
-Other cards may change only where one of these rules applies: a controlling session ended before
-`ready` (#40) or a session had a prompt before any stop (#43). Explain each such change in the PR body
-with its event times; a change no rule explains is a bug, so stop and investigate before opening the PR.
+Any other change must be explained by one of these rules, with event times, in the PR body; a change
+no rule explains is a bug, so stop and investigate before opening the PR.
 
 - [ ] **Step 2: Push and open the PR**
 
@@ -1176,8 +1335,8 @@ rollout steps below. It ends with the attribution line.
 - [ ] **Step 3: Rollout steps (in the PR body; run after merge)**
 
 1. `cd ~/Desktop/src/echo-official/lean-harness && git switch main && git pull --ff-only`.
-2. `harness install --user` — required: the bootstrap text changed, and `harness doctor` fails every
-   task start until the installed copy matches.
+2. `harness install --user` — required: the bootstrap text changed, and every `harness start` fails
+   its install probe until the installed copy matches.
 3. `harness doctor` in mvp, echo-wiki and echo-theory-plugins.
 4. `harness score` in echo-wiki and mvp (real state dir) once the diff above is accepted.
 5. Projects keep working without edits (`merge` absent = `user`). Project-side follow-ups are in
@@ -1194,30 +1353,62 @@ rollout steps below. It ends with the attribution line.
 
 | § | Replace | With |
 |---|---|---|
-| Header | `Status: approved 2026-10-08 (Fable review: APPROVE) · owner: the user (sole developer).` | `Status: approved 2026-10-08 (Fable review: APPROVE); amended 2026-10-09 by the v0 hardening plan (H1–H10 in §2.2) · owner: the user (sole developer).` |
-| 2.2 | (table end) | Add rows H1–H10, Type **A** or **O**, one per change below, Why = the gap number and the task that showed it |
+| Header | `Status: approved 2026-10-08 (Fable review: APPROVE) · owner: the user (sole developer).` | `Status: approved 2026-10-08 (Fable review: APPROVE); amended 2026-10-09 by the v0 hardening plan (H1–H11 in §2.2) · owner: the user (sole developer).` |
+| 2.2 | (table end) | Add rows H1–H11 (list below), Type **A** (added) or **O** (override), Why = the gap number and the task that showed it |
+| 3 | Controlling session: "…for the task (recorded in `state.json`)" | "…for the task (the session of the latest phase enter, or of the latest `harness start` in the task, from the event log)" (H2) |
 | 4.6 | "`harness pr`'s push still triggers the project's pre-push hook (mvp runs `npm run preflight`), and that time is charged to the task because it is real;" | "`harness pr`'s first push triggers the project's pre-push hook (mvp runs `npm run preflight`), and that time is charged to the task because it is real; its follow-up push adds only harness bookkeeping in `.harness/` on the same code tree and skips the hook (H7); the agent writes the PR title in the project's commit style (`--title`, H6);" |
+| 5.2 Verify row | Ends when: "Every final check passes; a failure returns to build" | "Every check that can pass before the PR passes; a failure returns to build; checks that need the open PR are recorded after `harness pr` opens it (H5)" |
 | 5.2 PR row | "Passing checks → an open PR and `ready`" / "`harness pr <task-id>`" / "`ready` emitted" | "Runnable checks pass → an open PR; every check passes, observational ones included → `ready`" / "`harness pr [<task-id>] [--title T]`" / "`ready` emitted (until then the PR body says it is not ready)" (H5) |
-| 5.5 | Template `<date time> · …` and "one stamped line per entry" | Template `<date> · …`; "one dated line per entry; the event log holds exact times" (H8). `Check:` may list several ids (`Check: C6, C7`) (H1) |
+| 5.2 after the table | "After `ready`: any edit, rebase or check starts with `harness phase build enter`;" | "After `ready` or a handoff exit: any edit, rebase or check starts with `harness phase build enter` (`check` and `pr` refuse until then, H5);" |
+| 5.5 | Template `<date time> · …`; "one stamped line per entry" | Template `<date> · …`; "one dated line per entry; the event log holds exact times" (H8); `Check:` may list ids (`Check: C6, C7`) (H1) |
 | 5.7 | "A re-plan may change a check only with a Decision naming it (`Check: C3`, or `Check: goal`)." | "A re-plan may change a check only with a Decision naming it (`Check: C3`, `Check: C6, C7`, or `Check: goal`)." (H1) |
 | 6.1 | `state.json` row: "`start --new`; `harness phase`" / "Start; every phase enter/exit" | "`start --new`" / "Start" (H2) |
-| 6.2 | (table) | Add row: `merge` · `"user"` · "Who merges after `ready`: `user`, or `agent` (after `pr --refresh`, with `gh pr merge --match-head-commit`); printed by `harness pr`; never auto-merge" (H4) |
-| 6.4 | "`task_id`, `branch`, `phase`, `phase_open` (bool), `controlling_session` (nullable), `created_at`." | "`task_id`, `branch`, `created_at`. The open phase and its controlling session come from the task's phase events; `harness start` prints them; nothing reads them from `state.json` (H2)." |
-| 6.10 | After "…from a `--handoff` phase exit to the successor's `resume`." | Add: "The controlling session's end (the session of the latest phase enter) also pauses the clock, and the task's next `harness` command restarts it: no agent is working in between. A session that waits for your reply stays alive and stays charged (H3)." And in the agent-time sentence after "before the next prompt or session end": "(a prompt that arrives before any stop, such as a queued message delivered mid-turn, closes the open span at that prompt) (H9)" |
-| 7 | `pr <task-id>` row | Command `pr [<task-id>] [--title T]`; Does: "Runnable checks must pass; commit `.harness/`, push (hooked), open or update the PR; if observational checks are unrecorded at this code tree: `pr`, PR body 'not ready', exit 0 without `ready`; else `ready` + `pr`, commit, push (no hook), print the merge rule" (H5–H7) |
-| 7 | `pr --refresh` row | Add to Does: "observational checks owed at the rebased code: PR body 'not ready', `build exit --handoff`, exit 1" (H5) |
-| 7 | `phase` row, Refuses when | Add: "`plan.md` without a goal or usable checks (every command but `triage enter`) (H10)" — and add H10 to §2.2 |
+| 6.2 | (table) | Add row: `merge` · `"user"` · "Who merges after `ready`: `user`, or `agent` (after `pr --refresh`, with `gh pr merge --match-head-commit`; not with a merge queue); printed by `harness pr`; never auto-merge" (H4) |
+| 6.4 | "`task_id`, `branch`, `phase`, `phase_open` (bool), `controlling_session` (nullable), `created_at`." | "`task_id`, `branch`, `created_at`. The open phase comes from the task's phase events, and `harness start` prints it; nothing reads a phase from `state.json` (H2)." |
+| 6.5 | "S plans hold only the first five." | "S plans hold the first five, plus `## Decisions` when one is logged (H11)." |
+| 6.10 | After "…from a `--handoff` phase exit to the successor's `resume`." | Add: "The controlling session's end (§3) also pauses the clock, and the task's next `harness` command restarts it: no harness-driven agent works in between. Work by a session that never runs a `harness` command is not charged. A session waiting for your reply stays alive and stays charged; an adapter without a session-end event keeps the clock running (H3)." In the agent-time sentence, after "before the next prompt or session end", add: "(a prompt that arrives before any stop, such as a queued message delivered mid-turn, closes the open span at that prompt), cut at the clock's stop (H9)" |
+| 7 | `phase` row, Does: "`state.json` + phase event; first `build enter` snapshots `plan.approved.md`" | "Phase event; first `build enter` snapshots `plan.approved.md`"; Refuses when: add "`plan.md` without a goal or usable checks (every command but `triage enter`) (H10)" |
+| 7 | `check` row, Refuses when | Add: "after `ready` or a handoff exit, until a phase enter (H5)" |
+| 7 | `pr <task-id>` row | Command `pr [<task-id>] [--title T]`; Does: "Runnable checks must pass; commit `.harness/`, push (hooked), open or update the PR; observational checks not yet passed at this code tree: `pr`, PR body 'not ready', no `ready`; else `ready` (revalidated under the spool lock) + `pr`, commit, push (no hook), print the merge rule"; Refuses when: "Failing or stale runnable checks; a check that failed while the PR opened; no `triage enter`; delegate; after `ready` or a handoff exit until a phase enter" (H5–H7) |
+| 7 | `pr --refresh` row | Run by: "You (the agent when `merge` is `agent`)"; Does: add "observational checks owed at the rebased code: PR body 'not ready', `build exit --handoff`" (H4, H5) |
+| 9 item 5 | "Only the controlling session (or you, for `pr --refresh` and manual `build enter`)" | "Only the controlling session (or you, for `pr --refresh` and manual `build enter`; the agent may run `pr --refresh` when `merge` is `agent`)" (H4) |
+| 14 | (table) | Add rows: "Rebase merges: a commit added after the last `ready` is not seen by the gate · Use squash or merge commits (`docs/project-setup.md`); the gate stays forge-free (§9.8)" and "`merge: agent` in a repository with a merge queue: `gh pr merge` may enable auto-merge · Not supported; the printed rule excludes it" |
 
-(H1 Decision lists · H2 phase from events · H3 controller-end pause · H4 merge rule · H5 observational
-checks after the PR · H6 PR title · H7 one hooked push · H8 date-only notes · H9 mid-turn prompts ·
-H10 plan validation.)
+H1 Decision lists · H2 phase from events · H3 controller-end pause · H4 merge rule · H5 observational
+checks after the PR and phase enter after a handoff · H6 PR title · H7 one hooked push · H8 date-only
+notes · H9 mid-turn prompts and cutoff · H10 plan validation with fence-aware parsing · H11 S-plan
+Decisions.
 
-- [ ] **Step 2: Re-read the whole spec for sentences that now contradict a delta** (§5.2 "After
-  `ready`" paragraph, §6.11, §9, §17 daily use) and fix each in the same commit.
+- [ ] **Step 2: Re-read the whole spec for sentences that now contradict a delta** (§4.4, §5.2, §6.11,
+  §7, §9, §17) and fix each in the same commit.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-10-08-lean-harness-v0-product-spec.md
-git commit -m "docs(lean-harness): spec deltas H1–H10 from the v0 hardening plan"
+git commit -m "docs(lean-harness): spec deltas H1–H11 from the v0 hardening plan"
 ```
+
+---
+
+## Review log
+
+### Round 1 (r1 → r2): Fable REVISE, GPT Astra REVISE
+
+| # | Reviewer | Finding | r2 |
+|---|---|---|---|
+| 1 | Astra (blocker), Fable (major) | Controller only from phase enters: a successor that continues an open phase and ends never pauses | Fixed: controller also from `resume`; two-endings test (Task 6) |
+| 2 | Astra, Fable (blocker) | Refresh hand-back printed "run `harness pr`" → `ready` with the clock paused, incomplete timing | Fixed: hand-back messages say `harness phase build enter` first; `check`/`pr` refuse after a handoff exit until a phase enter (`gate.needs_phase_enter`); tests assert both (Task 4) |
+| 3 | Astra (blocker) | `publish` emits `ready` from a stale event snapshot; a check failing during the push was missed | Fixed: revalidate under the spool lock before `ready`; pre-push-hook race test (Task 4) |
+| 4 | Astra, Fable (blocker) | Instructions still said verify ends when every check passes; `build.md` last line failed the new title test | Fixed: `verify.md` step 5 and Commands, `build.md` last paragraph reworded; the title-text test dropped (Task 5 covers behavior) (Task 7) |
+| 5 | Astra (blocker) | New regex lost the word boundary: `Check: goalpost` counted as `goal` | Fixed: each id bounded; negative tests (Task 1) |
+| 6 | Astra (blocker) | Validation would refuse valid plans whose check commands contain `## ` lines (#17) | Fixed: fence-aware `_split` (Task 3) |
+| 7 | Astra (major) | #4 and #15 still give wrong scores | #15 fixed (cutoff, Task 6). #4 kept deferred: needs the forge (§9.8); boundary stated in docs and spec §14 |
+| 8 | Astra (major) | `gh pr merge` may enable auto-merge with a merge queue | Printed rule and docs exclude merge-queue repositories; spec §14 row |
+| 9 | Astra (major), Fable (minor) | Spec deltas missed §3, §6.5, §7 `phase`/`pr` rows; §6.4 promised a printed controller | Added §3, §5.2 Verify and after-table, §6.5, §7 rows, §9, §14; §6.4 no longer mentions a printed controller |
+| 10 | Fable (major) | Task 9 listed changes as "only these"; E1 also changes | E1 row added with Fable's computed value; the rule-explanation clause kept |
+| 11 | Fable (minor) | "No agent is working" is not literal (M1 s2 worked without `harness start`) | §6.10 delta says "no harness-driven agent" and states the uncharged case |
+| 12 | Fable (minor) | H3 depends on a session-end event Codex may not emit | Stated in Global Constraints and §6.10 delta |
+| 13 | Fable (minor) | Title test claimed "task id from the branch" but the env carried it | Test now removes `HARNESS_TASK_ID` |
+| 14 | Astra (YAGNI) | #36 "derivable" overstated | Deferred row reworded |
+| 15 | Fable (YAGNI, optional) | Cut the `merge` knob | Kept: the user asked that agents can merge when mandated (cloud); one key and one string, default unchanged |
