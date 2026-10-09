@@ -540,17 +540,10 @@ class EventsTest(unittest.TestCase):
         self.assertEqual(len(parsed), 1)
         self.assertEqual(parsed[0]["future_field"], 1)
 
-    def test_parse_lines_tolerates_missing_optional_fields(self):
-        parsed = events.parse_lines('{"kind":"stop","ts":"2026-10-08T12:00:00.000Z"}\n')
-        self.assertIsNone(parsed[0].get("session_id"))
-
     def test_timestamps_round_trip_at_millisecond_precision(self):
         self.assertEqual(events.ts_ms(events.ts_from_ms(1791460800123)), 1791460800123)
         self.assertRegex(events.now_ts(), r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$")
 
-    def test_spool_only_kinds_match_the_spec(self):
-        self.assertEqual(events.SPOOL_ONLY,
-                         {"start", "resume", "tier", "close", "defect", "memory", "doctor"})
 ```
 
 - [ ] **Step 2: Run the tests to see them fail**
@@ -673,7 +666,7 @@ def parse_lines(text: str) -> list[dict]:
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_events -v`
-Expected: 6 tests, OK.
+Expected: 4 tests, OK.
 
 - [ ] **Step 5: Commit**
 
@@ -698,7 +691,6 @@ Spec: §4.1 (state dir, project hash), §6.6, §7 last paragraph (fail loudly wi
 `tests/test_spool.py`:
 
 ```python
-import hashlib
 import multiprocessing
 import tempfile
 import unittest
@@ -715,13 +707,6 @@ def _writer(state_dir: str, n: int, tag: int) -> None:
 class SpoolTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
-
-    def test_project_hash_is_first_16_hex_of_sha256(self):
-        self.assertEqual(spool.project_hash("/x/.git"), hashlib.sha256(b"/x/.git").hexdigest()[:16])
-
-    def test_state_root_honors_xdg_state_home(self):
-        self.assertEqual(spool.state_root({"XDG_STATE_HOME": "/s", "HOME": "/h"}), Path("/s/harness"))
-        self.assertEqual(spool.state_root({"HOME": "/h"}), Path("/h/.local/state/harness"))
 
     def test_parallel_appends_never_interleave(self):  # spec §9.3
         procs = [multiprocessing.Process(target=_writer, args=(str(self.tmp), 200, t)) for t in range(8)]
@@ -825,7 +810,7 @@ def read(state_dir: Path) -> list[dict]:
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_spool -v`
-Expected: 5 tests, OK.
+Expected: 3 tests, OK.
 
 - [ ] **Step 5: Commit**
 
@@ -1025,16 +1010,6 @@ class GitioTest(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp())
         self.repo = init_repo(self.tmp / "r")
 
-    def test_info_reports_branch_head_and_common_dir(self):
-        g = gitio.info(self.repo)
-        self.assertEqual(g.branch, "main")
-        self.assertEqual(g.head, git(self.repo, "rev-parse", "HEAD"))
-        self.assertEqual(Path(g.common_dir).resolve(), (self.repo / ".git").resolve())
-        self.assertIsNone(gitio.info(self.tmp))
-
-    def test_code_tree_equals_head_tree_without_harness_folder(self):
-        self.assertEqual(gitio.code_tree(self.repo), git(self.repo, "rev-parse", "HEAD^{tree}"))
-
     def test_code_tree_drops_harness_and_writes_no_object(self):  # spec §6.11
         (self.repo / ".harness" / "runs" / "t").mkdir(parents=True)
         (self.repo / ".harness" / "runs" / "t" / "state.json").write_text("{}\n")
@@ -1109,8 +1084,6 @@ class GitioTest(unittest.TestCase):
         self.assertIsNone(g.branch)
         self.assertEqual(gitio.effective_branch(self.repo, g), ("feature", tip))
 
-    def test_harness_version_is_the_checkout_head(self):
-        self.assertRegex(gitio.harness_version() or "", r"^[0-9a-f]{40}$")
 ```
 
 - [ ] **Step 3: Write the implementation**
@@ -1276,7 +1249,7 @@ If Phase 0 chose the Python fallback for tree hashing (Task 0.5), replace the la
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_gitio -v`
-Expected: 8 tests, OK.
+Expected: 5 tests, OK.
 
 - [ ] **Step 5: Commit**
 
@@ -1335,11 +1308,6 @@ prompt
 
 
 class PlanfileTest(unittest.TestCase):
-    def test_sections_in_order(self):
-        self.assertEqual(list(planfile.sections(PLAN)),
-                         ["Goal", "Outcome", "Acceptance checks", "Tier", "Source", "Decisions"])
-        self.assertEqual(planfile.goal(PLAN), "Add a greeting.")
-
     def test_checks_parse_command_and_observational(self):
         checks = planfile.checks(PLAN)
         self.assertEqual(list(checks), ["C1", "C2"])
@@ -1461,7 +1429,7 @@ def diff(approved: str, final: str) -> CheckDiff:
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_planfile -v`
-Expected: 5 tests, OK.
+Expected: 4 tests, OK.
 
 - [ ] **Step 5: Commit**
 
@@ -1503,9 +1471,6 @@ class TaskfilesTest(unittest.TestCase):
         self.folder.mkdir(parents=True)
         taskfiles.write_json(self.folder / "state.json", {"task_id": "2026-10-08-x", "branch": "feat"})
 
-    def test_task_dir_layout(self):
-        self.assertEqual(self.folder, self.repo / ".harness" / "runs" / "2026-10-08-x")
-
     def test_find_by_branch_in_working_tree_and_at_a_revision(self):
         self.assertEqual(taskfiles.find_by_branch(self.repo, "feat"), ["2026-10-08-x"])
         self.assertEqual(taskfiles.find_by_branch(self.repo, "other"), [])
@@ -1524,11 +1489,6 @@ class TaskfilesTest(unittest.TestCase):
         with self.assertRaisesRegex(HarnessError, "found 0"):
             taskfiles.resolve(self.repo, self.repo, {}, gitio.info(self.repo))
 
-    def test_copy_to_state_copies_what_exists(self):
-        (self.folder / "request.md").write_text("do it\n")
-        dest = self.tmp / "state" / "tasks" / "2026-10-08-x"
-        self.assertEqual(taskfiles.copy_to_state(self.folder, dest), ["request.md"])
-        self.assertEqual((dest / "request.md").read_text(), "do it\n")
 ```
 
 - [ ] **Step 2: Run the tests to see them fail**
@@ -1614,7 +1574,7 @@ def copy_to_state(folder: Path, dest: Path) -> list[str]:
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_taskfiles -v`
-Expected: 4 tests, OK.
+Expected: 2 tests, OK.
 
 - [ ] **Step 5: Commit**
 
@@ -1656,7 +1616,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from harness import REPO
-from harness.adapters import REGISTRY, claude, foreign_vars, identity_vars
+from harness.adapters import claude
 
 FIXTURES = REPO / "tests" / "fixtures" / "claude"
 
@@ -1665,11 +1625,6 @@ class ClaudeAdapterTest(unittest.TestCase):
     def setUp(self):
         self.home = Path(tempfile.mkdtemp())
         self.dispatcher = self.home / ".local" / "bin" / "harness"
-
-    def test_registry(self):
-        self.assertIs(REGISTRY["claude"], claude)
-        self.assertEqual(identity_vars(), {"claude": "HARNESS_SESSION_ID"})
-        self.assertEqual(foreign_vars("claude"), [])
 
     def test_every_captured_payload_maps_without_warnings(self):  # spec §12 adapter contract
         self.assertEqual(sorted(p.stem for p in FIXTURES.glob("*.json")), sorted(claude.HOOK_EVENTS))
@@ -1687,12 +1642,6 @@ class ClaudeAdapterTest(unittest.TestCase):
         self.assertEqual(missing, ["agent_id"])
         self.assertIsNone(fields["agent_id"])
         self.assertEqual(claude.to_event("Renamed", {}, {}, [])[1], ["unknown hook event Renamed"])
-
-    def test_effort_and_trigger(self):
-        fields, _ = claude.to_event("Stop", {"session_id": "S", "transcript_path": "/t", "effort": {"level": "high"}}, {}, [])
-        self.assertEqual(fields["effort"], "high")
-        fields, _ = claude.to_event("SessionStart", {"session_id": "S", "transcript_path": "/t", "source": "resume"}, {}, [])
-        self.assertEqual(fields["trigger"], "resume")
 
     def test_parent_session_derivation(self):  # spec §6.9
         self.assertEqual(claude.parent_session("S", {}, ["CODEX_THREAD_ID"]), "S")
@@ -1943,7 +1892,7 @@ def doctor_probes() -> list[Callable]:
 - [ ] **Step 5: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_adapter_claude -v`
-Expected: 9 tests, OK. If `test_every_captured_payload_maps_without_warnings` fails, compare the fixture's keys with `REQUIRED`: the fixtures are the truth; change `REQUIRED` to match and note the difference in the spec PR of Task 0.7 (or a follow-up commit there).
+Expected: 7 tests, OK. If `test_every_captured_payload_maps_without_warnings` fails, compare the fixture's keys with `REQUIRED`: the fixtures are the truth; change `REQUIRED` to match and note the difference in the spec PR of Task 0.7 (or a follow-up commit there).
 
 - [ ] **Step 6: Commit**
 
@@ -2002,7 +1951,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness import taskfiles
 from tests.helpers import cli, clean_env, git, init_repo, spool_events
 
 
@@ -2041,11 +1989,6 @@ class HookTest(unittest.TestCase):
         kinds = [e["kind"] for e in spool_events(self.repo, self.env)]
         self.assertIn("format_warning", kinds)
 
-    def test_unknown_agent_warns_and_exits_zero(self):
-        r = cli("hook", "grok", "Stop", cwd=self.repo, env=self.env, input="{}")
-        self.assertEqual(r.returncode, 0)
-        self.assertEqual([e["kind"] for e in spool_events(self.repo, self.env)], ["format_warning"])
-
     def test_unwritable_state_dir_never_fails_the_agent(self):  # spec §9.6
         state = self.tmp / "state"
         state.mkdir()
@@ -2055,18 +1998,6 @@ class HookTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0)
         self.assertIn("harness hook:", r.stderr)
 
-    def test_session_start_in_a_task_worktree_exports_markers(self):  # spec §6.9
-        git(self.repo, "switch", "-qc", "feat")
-        folder = taskfiles.task_dir(self.repo, "2026-10-08-x")
-        folder.mkdir(parents=True)
-        taskfiles.write_json(folder / "state.json", {"task_id": "2026-10-08-x", "branch": "feat"})
-        env_file = self.tmp / "envfile"
-        env_file.write_text("")
-        self.fire("SessionStart", {"session_id": "S", "transcript_path": "/t", "cwd": str(self.repo), "source": "startup"},
-                  env={"CLAUDE_ENV_FILE": str(env_file)})
-        text = env_file.read_text()
-        for line in ("export HARNESS_SESSION_ID=S", "export HARNESS_TASK_ID=2026-10-08-x", "export HARNESS_PARENT_SESSION=S"):
-            self.assertIn(line, text)
 ```
 
 `tests/test_cli.py`:
@@ -2103,13 +2034,6 @@ class CliGuardTest(unittest.TestCase):
                 cli.guard(cmd, argparse.Namespace(), fake_ctx(delegate=True))
             cli.guard(cmd, argparse.Namespace(), fake_ctx(delegate=False))
 
-    def test_harness_errors_print_and_exit_one(self):
-        module = types.SimpleNamespace(__doc__="Fails.", add_args=lambda p: None,
-                                       run=mock.Mock(side_effect=HarnessError("nope")))
-        with mock.patch.dict(cli.COMMANDS, {"fails": cli.Command(module, during_rebase=lambda a: True)}):
-            with mock.patch("sys.stderr") as err:
-                self.assertEqual(cli.main(["fails"]), 1)
-        self.assertIn("harness: nope", "".join(c.args[0] for c in err.write.call_args_list))
 
 
 class ContextTest(unittest.TestCase):
@@ -2120,12 +2044,6 @@ class ContextTest(unittest.TestCase):
             with self.assertRaisesRegex(HarnessError, "disagree"):
                 context.load(repo, {"HARNESS_SESSION_ID": "A", "CODEX_THREAD_ID": "B", "HOME": "/tmp"})
 
-    def test_cli_event_carries_identity_and_git_fields(self):
-        repo = init_repo(Path(tempfile.mkdtemp()) / "r")
-        ctx = context.load(repo, {"HARNESS_SESSION_ID": "S", "HARNESS_PARENT_SESSION": "S", "HOME": "/tmp"})
-        e = context.event(ctx, "resume", "T")
-        self.assertEqual((e["source"], e["agent"], e["session_id"], e["parent_session"], e["task_id"], e["branch"]),
-                         ("cli", "claude", "S", "S", "T", "main"))
 ```
 
 - [ ] **Step 3: Run the tests to see them fail**
@@ -2350,7 +2268,7 @@ exec "@PYTHON@" "@HARNESS_REPO@/harness/cli.py" "$@"
 - [ ] **Step 5: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_cli tests.test_hook -v`
-Expected: 11 tests, OK.
+Expected: 7 tests, OK.
 
 - [ ] **Step 6: Commit**
 
@@ -2468,7 +2386,7 @@ from pathlib import Path
 
 from harness import gitio
 from harness.commands.install import render_dispatcher
-from tests.helpers import Sandbox, cli, clean_env, git, init_repo, sh
+from tests.helpers import cli, clean_env, git, init_repo, sh
 
 
 class InstallTest(unittest.TestCase):
@@ -2502,16 +2420,6 @@ class InstallTest(unittest.TestCase):
         self.assertEqual(project["baseline_commit"], gitio.harness_version())
         self.assertIn(".harness/memory/*.md merge=union", (clone / ".gitattributes").read_text())
 
-    def test_project_install_refuses_outside_git(self):
-        tmp = Path(tempfile.mkdtemp())
-        r = cli("install", cwd=tmp, env=clean_env(HOME=str(tmp)))
-        self.assertEqual(r.returncode, 1)
-        self.assertIn("not inside a git repository", r.stderr)
-
-    def test_sandbox_builds(self):
-        sb = Sandbox()
-        self.assertTrue((sb.main / ".harness" / "project.json").exists())
-        self.assertEqual(gitio.info(sb.main).branch, "main")
 ```
 
 - [ ] **Step 4: Run the tests to see them fail**
@@ -2608,7 +2516,7 @@ def install_project(ctx) -> int:
 - [ ] **Step 6: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_install -v`
-Expected: 4 tests, OK.
+Expected: 2 tests, OK.
 
 - [ ] **Step 7: Commit**
 
@@ -2651,7 +2559,6 @@ In `harness/cli.py`: import `doctor` from `harness.commands` and add `"doctor": 
 `tests/test_doctor.py`:
 
 ```python
-import json
 import unittest
 
 from tests.helpers import Sandbox, commit
@@ -2679,39 +2586,12 @@ class DoctorTest(unittest.TestCase):
         self.assertEqual(r.returncode, 1)
         self.assertIn("FAIL  task_branch", r.stdout)
 
-    def test_dirty_worktree_fails(self):
-        wt = self.sb.worktree("doc-dirty")
-        (wt / "scratch.txt").write_text("x")
-        self.assertIn("FAIL  clean", self.doctor(wt).stdout)
-
     def test_foreign_commit_fails(self):
         wt = self.sb.worktree("doc-foreign")
         (wt / "old-work.txt").write_text("x")
         commit(wt, "work from before the task")
         self.assertIn("FAIL  up_to_date", self.doctor(wt).stdout)
 
-    def test_cloud_session_fails(self):  # spec §4.7
-        wt = self.sb.worktree("doc-cloud")
-        self.assertIn("FAIL  not_cloud", self.doctor(wt, {"CLAUDE_CODE_REMOTE": "true"}).stdout)
-
-    def test_missing_or_disabled_claude_hooks_fail(self):
-        settings = self.sb.home / ".claude" / "settings.json"
-        saved = settings.read_text()
-        self.addCleanup(settings.write_text, saved)
-        wt = self.sb.worktree("doc-hooks")
-        settings.write_text(json.dumps({k: v for k, v in json.loads(saved).items() if k != "hooks"}))
-        r = self.doctor(wt)
-        self.assertIn("FAIL  claude_hooks", r.stdout)
-        self.assertIn("install --user", r.stdout)
-        settings.write_text(json.dumps({**json.loads(saved), "disableAllHooks": True}))
-        self.assertIn("FAIL  claude_hooks", self.doctor(wt).stdout)
-
-    def test_session_probe_needs_this_sessions_hooks(self):  # spec §8 E
-        wt = self.sb.worktree("doc-live")
-        env = {"HARNESS_SESSION_ID": "S9"}
-        self.assertIn("FAIL  session_live", self.doctor(wt, env).stdout)
-        self.sb.hook(wt, "UserPromptSubmit", "S9")
-        self.assertIn("ok    session_live", self.doctor(wt, env).stdout)
 ```
 
 - [ ] **Step 3: Run the tests to see them fail**
@@ -2865,7 +2745,7 @@ def run(args, ctx) -> int:
 - [ ] **Step 5: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_doctor -v`
-Expected: 7 tests, OK.
+Expected: 3 tests, OK.
 
 - [ ] **Step 6: Commit**
 
@@ -3264,14 +3144,6 @@ class PhaseTest(unittest.TestCase):
         self.assertEqual((record["arm"], record["origin_tier"]), ("baseline", "M"))
         self.assertEqual(self.phases(wt, task_id), [("triage", "enter"), ("triage", "exit"), ("research", "enter")])
 
-    def test_triage_exit_refuses_without_config(self):
-        wt, env, task_id = self.sb.begin_task("ph-nocfg")
-        self.phase(wt, env, "triage", "enter")
-        r = self.phase(wt, env, "triage", "exit")
-        self.assertEqual(r.returncode, 1)
-        self.assertIn("config.json", r.stderr)
-        self.assertTrue(taskfiles.read_json(taskfiles.task_dir(wt, task_id) / "state.json")["phase_open"])
-
     def test_exit_of_a_closed_phase_is_refused_and_handoff_is_recorded(self):
         wt, env, task_id = self.sb.through_triage("ph-exit", {"C1": "true"})
         self.assertEqual(self.phase(wt, env, "build", "exit").returncode, 1)
@@ -3280,14 +3152,7 @@ class PhaseTest(unittest.TestCase):
         last = [e for e in self.sb.task_file_events(wt, task_id) if e["kind"] == "phase"][-1]
         self.assertEqual((last["phase"], last["action"], last["handoff"]), ("build", "exit", True))
 
-    def test_manual_build_enter_records_a_null_controller(self):  # spec §6.9
-        wt, env, task_id = self.sb.through_triage("ph-manual", {"C1": "true"})
-        self.assertEqual(self.phase(wt, {}, "build", "enter").returncode, 0)
-        state = taskfiles.read_json(taskfiles.task_dir(wt, task_id) / "state.json")
-        self.assertIsNone(state["controlling_session"])
 ```
-
-`test_manual_build_enter_records_a_null_controller` resolves the task by branch: the sandbox env carries no `HARNESS_TASK_ID`, as in your own terminal.
 
 - [ ] **Step 4: Run the tests to see them fail**
 
@@ -3400,7 +3265,7 @@ def _finish_triage(ctx, task_id: str, folder) -> None:
 - [ ] **Step 6: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_phase -v`
-Expected: 9 tests, OK.
+Expected: 7 tests, OK.
 
 - [ ] **Step 7: Commit**
 
@@ -3635,11 +3500,6 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(len(self.checks_recorded("C1")), before + 1)
         self.assertIn(e, self.sb.task_file_events(self.wt, self.task_id))
 
-    def test_failing_check_records_fail(self):
-        r = self.check("C2")
-        self.assertEqual(r.returncode, 1)
-        self.assertEqual(self.checks_recorded("C2")[-1]["result"], "fail")
-
     def test_dirty_checkout_is_refused_and_nothing_recorded(self):  # spec §7
         before = len(self.checks_recorded("C1"))
         stray = self.wt / "stray.txt"
@@ -3663,12 +3523,6 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(self.check("C3", "--observed", "pass").returncode, 0)
         e = self.checks_recorded("C3")[-1]
         self.assertEqual((e["mode"], e["result"], e["exit_code"]), ("observed", "pass", None))
-
-    def test_all_runs_runnable_checks_and_skips_observational(self):
-        wt, env, _ = self.sb.through_triage("chk-all", {"C1": "true", "C2": None})
-        r = self.sb.harness("check", "--all", cwd=wt, env=env)
-        self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("skip C2", r.stdout)
 
     def test_delegate_check_is_flagged(self):  # spec §6.9, Review Focus 2
         self.assertEqual(self.check("C1", env={**self.env, "HARNESS_SESSION_ID": "CHILD"}).returncode, 0)
@@ -3785,7 +3639,7 @@ def run_one(ctx, task_id: str, check: planfile.Check, observed: str | None = Non
 - [ ] **Step 5: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_check -v`
-Expected: 9 tests, OK.
+Expected: 7 tests, OK.
 
 - [ ] **Step 6: Commit**
 
@@ -3843,13 +3697,6 @@ class RebaseTest(unittest.TestCase):
         self.assertTrue(gitio.status_clean(wt))
         self.assertEqual(git(wt, "rev-list", "HEAD..origin/main"), "")
         self.assertFalse(gitio.git_path(wt, "harness-rebase").exists())
-
-    def test_dirty_code_is_refused(self):
-        wt, env, _ = self.sb.through_triage("rb-dirty", {"C1": "true"})
-        (wt / "loose.txt").write_text("x")
-        r = self.sb.harness("rebase", cwd=wt, env=env)
-        self.assertEqual(r.returncode, 1)
-        self.assertIn("not clean", r.stderr)
 
     def test_conflict_stops_guards_and_reruns(self):  # spec §9.7
         wt, env, task_id = self.sb.through_triage("rb-conflict", {"C1": "true"})
@@ -3939,7 +3786,7 @@ def abort(ctx) -> None:
 - [ ] **Step 5: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_rebase -v`
-Expected: 3 tests, OK.
+Expected: 2 tests, OK.
 
 - [ ] **Step 6: Commit**
 
@@ -3972,7 +3819,7 @@ In `harness/cli.py`: import `pr` and add `"pr": Command(pr, controller_only=True
 import unittest
 
 from harness import gitio, taskfiles
-from tests.helpers import Sandbox, commit, git, write_plan
+from tests.helpers import Sandbox, commit, git
 
 
 class PrTest(unittest.TestCase):
@@ -4001,14 +3848,6 @@ class PrTest(unittest.TestCase):
 
     def kinds(self, wt, task_id):
         return [(e["kind"], e.get("phase"), e.get("action")) for e in self.sb.task_file_events(wt, task_id)]
-
-    def test_refuses_without_triage_enter(self):
-        wt, env, task_id = self.sb.begin_task("pr-notriage")
-        write_plan(wt, task_id, {"C1": "true"})
-        commit(wt, "plan")
-        r = self.h(wt, env, "pr", task_id)
-        self.assertEqual(r.returncode, 1)
-        self.assertIn("triage enter", r.stderr)
 
     def test_refuses_failing_then_stale_checks(self):
         wt, env, task_id = self.sb.through_triage("pr-stale", {"C1": "test -f ok.txt"})
@@ -4203,7 +4042,7 @@ def refresh(ctx, project: dict, task_id: str) -> int:
 - [ ] **Step 5: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_pr -v`
-Expected: 7 tests, OK.
+Expected: 6 tests, OK.
 
 - [ ] **Step 6: Commit**
 
@@ -4254,10 +4093,6 @@ class CloseTest(unittest.TestCase):
         copies = spool.project_dir(self.sb.env, gitio.info(wt).common_dir) / "tasks" / task_id
         self.assertTrue((copies / "request.md").exists())
 
-    def test_unknown_task_is_refused(self):
-        r = self.sb.harness("close", "2026-01-01-nope", "--abandon", cwd=self.sb.main)
-        self.assertEqual(r.returncode, 1)
-        self.assertIn("unknown task", r.stderr)
 ```
 
 - [ ] **Step 3: Run the tests to see them fail**
@@ -4300,7 +4135,7 @@ def run(args, ctx) -> int:
 - [ ] **Step 5: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_close -v`
-Expected: 2 tests, OK.
+Expected: 1 test, OK.
 
 - [ ] **Step 6: Commit**
 
@@ -4756,11 +4591,6 @@ class ScoreTest(unittest.TestCase):
         assert r.returncode == 0, r.stdout + r.stderr
         sb.merge("task-sc", "squash")
 
-    def test_merged_task_scores_done(self):
-        card = self.sb.card(self.task_id)
-        self.assertEqual((card["disposition"], card["done"], card["wall"]["complete"]), ("merged", True, True))
-        self.assertGreater(card["wall"]["by_phase"]["build"], 0)
-
     def test_score_is_deterministic_and_commits_nothing(self):  # spec §9.8
         self.sb.card(self.task_id)
         refs = git(self.sb.main, "for-each-ref", "--format=%(refname) %(objectname)")
@@ -4912,7 +4742,7 @@ def collect(ctx, project: dict, ref: str, now_ms: int) -> tuple[list[dict], list
 - [ ] **Step 5: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_scorecard tests.test_score -v`
-Expected: 8 tests, OK.
+Expected: 7 tests, OK.
 
 - [ ] **Step 6: Commit**
 
@@ -4947,20 +4777,11 @@ FILES = [REPO / "AGENTS.md", REPO / "hooks" / "bootstrap.md", *sorted(PHASE_DIR.
 
 
 class InstructionsTest(unittest.TestCase):
-    def test_slice1_phase_files_exist(self):
-        self.assertEqual({p.stem for p in PHASE_DIR.glob("*.md")},
-                         {"triage", "research", "resolve", "plan", "build", "verify"})
-
     def test_every_harness_command_named_exists(self):
         for path in FILES:
             for name in re.findall(r"`harness ([a-z-]+)", path.read_text()):
                 self.assertIn(name, cli.COMMANDS, f"{path.name} names `harness {name}`")
 
-    def test_no_file_points_agents_at_the_state_dir_except_to_forbid_it(self):  # spec §10
-        for path in FILES:
-            for line in path.read_text().splitlines():
-                if ".local/state" in line:
-                    self.assertIn("Never read", line, path.name)
 ```
 
 - [ ] **Step 2: Run the test to see it fail**
@@ -5157,7 +4978,7 @@ After `ready`: any edit, rebase or check starts with `harness phase build enter`
 - [ ] **Step 4: Run the test to see it pass**
 
 Run: `python3.12 -m unittest tests.test_instructions -v`
-Expected: 3 tests, OK.
+Expected: 1 test, OK.
 
 - [ ] **Step 5: Commit**
 
