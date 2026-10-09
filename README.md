@@ -68,6 +68,12 @@ echo-theory-plugins/
 
 ---
 
+## Agent tasks (lean harness)
+
+Agent work in this repository runs as lean-harness tasks. Each task's record (request, plan and event log) lives in `.harness/runs/<task-id>/`. See the [Lean Harness v0 product spec](./docs/superpowers/specs/2026-10-08-lean-harness-v0-product-spec.md) for how tasks move through their phases.
+
+---
+
 ## Contributing
 
 Bug reports and skill improvements welcome. Open an issue or PR.
