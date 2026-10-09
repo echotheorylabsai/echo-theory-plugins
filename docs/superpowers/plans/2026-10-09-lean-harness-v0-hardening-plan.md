@@ -25,8 +25,8 @@ with `docs/superpowers/` (this repo).
 and are small), then the user's review protocol on the PR: independent adversarial reviews by Fable
 (`fable-reviewer`) and GPT Astra (`codex:codex-rescue`, `--model gpt-6-astra --effort xhigh --fresh`).
 
-**Revision:** r3 (2026-10-09). Round 1: Fable and GPT Astra both REVISE. Round 2: Fable APPROVE, GPT
-Astra REVISE. The review log at the end lists every finding and how each revision handles it.
+**Revision:** r4 (2026-10-09). Round 1: Fable and GPT Astra both REVISE. Round 2: Fable APPROVE, GPT
+Astra REVISE. Round 3: Fable APPROVE, GPT Astra REVISE (one instruction line). The review log at the end lists every finding and how each revision handles it.
 
 ## Global Constraints
 
@@ -846,7 +846,7 @@ def publish(ctx, project: dict, task_id: str) -> tuple[str, ...]:
         print(f"pr open: {url}\nnot ready: waiting for observation of {', '.join(pending)}.")
         return pending
     tip = gitio.out(["rev-parse", "HEAD"], ctx.root)
-    with spool.locked(ctx.state_dir):  # no check can land between this read and `ready`
+    with spool.locked(ctx.state_dir):  # no check lands between this read and `ready`; not reentrant: pass held=True inside
         now = context.task_events(ctx, task_id)
         late = gate.failing_checks(plan, now, tree)
         if late:  # the phase stays open, so a retry or refresh's hand-back still works
@@ -1323,6 +1323,10 @@ If another agent launched you, ignore this file and follow your prompt. Otherwis
 
 `skills/phases/build.md`:
 - **Commands** line and step 7: write `harness pr <task-id> --title "<title>"`.
+- Step 4, first clause: "When a milestone's checks pass (all but any that need the open PR), add one
+  implementation-note line…" (rest unchanged).
+- Step 6, first sentence: "When every milestone's checks that can pass before the PR have passed, run
+  `harness rebase`." (rest unchanged).
 - Step 7, first line: "7. Build ends when every check passes after the rebase, except checks that need
   the open PR (verify records those after `harness pr` opens it)." 
 - Last paragraph: "After `ready`, any edit, rebase or check starts with `harness phase build enter`;
@@ -1538,3 +1542,10 @@ git commit -m "docs(lean-harness): spec deltas H1–H12 from the v0 hardening pl
 | 7 | Fable (minor) | `harness start` printed "build (exited)" after a handoff instead of the reason | Fixed: `_where` uses `needs_phase_enter` (Task 4) |
 | 8 | Fable (minor) | Controller-from-`resume` trade-off unstated | Stated in the §6.10 delta |
 | 9 | Astra | Rebase merges (#4) | Accepted as non-blocking under the stated boundary |
+
+### Round 3 (r3 → r4): Fable APPROVE, GPT Astra REVISE
+
+| # | Reviewer | Finding | r4 |
+|---|---|---|---|
+| 1 | Astra (blocker) | `build.md` step 6 ("when every milestone passes, run `harness rebase`") still blocks a milestone that names a PR-dependent check | Fixed: steps 4 and 6 except checks that need the open PR (Task 7) |
+| 2 | Fable (minor) | `flock` is not reentrant: a future call inside `publish`'s locked block must pass `held=True` | Comment added at the `with` (Task 4) |
