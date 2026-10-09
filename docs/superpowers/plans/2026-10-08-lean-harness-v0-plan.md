@@ -23,7 +23,7 @@
 - Native agent memory is never disabled, checked or recorded (C1). No harness-defined subagents (C2). No `worktree.baseRef` (C11).
 - `.gitattributes` line: `.harness/memory/*.md merge=union` (§4.1).
 - Allow rule: `Bash(harness:*)` (§4.1).
-- Claude Code and Codex run on your subscriptions, not API keys: nothing in the harness reads, sets or needs an API key, and smoke and real runs use your logged-in sessions.
+- Claude Code and Codex run on your subscriptions, not API keys: nothing in the harness reads, sets or needs an Anthropic or OpenAI API key, and smoke and real runs use your logged-in sessions (`gh` keeps its own `gh auth login`).
 
 ## Conventions
 
@@ -437,7 +437,7 @@ git worktree add ../echo-theory-plugins-phase0 -b claude/lean-harness-phase0-res
 - [ ] **Step 2: Edit the spec**
   - §11 Phase 0 "Adds" cell: replace "`install --user` dry run there" with "a temporary hand-added logging hook for the user-level hook checks (removed afterwards; `install --user` is first exercised in Slice 1)".
   - §13 "Remaining" table: for the desktop-app row and the `hash-object` row, state the Phase 0 result (confirmed, or the fallback chosen) with the date.
-  - §8: replace the group table with R-22's list of checks, and note the dropped ones fail loudly at use (your direction).
+  - §8: replace the group table with R-22's list of checks, and note the dropped ones fail loudly at use (your direction); in §7, §11 and §13, replace the A–E references with "install probes", "pre-start probes" and "session probe".
   - §16: add a "Phase 0 (date)" paragraph: fixture fields that differ from §16 (if any), desktop-app hook results, hook and Bash `PATH` per app, the `hash-object` result.
 
 - [ ] **Step 3: Commit and push**
@@ -480,7 +480,7 @@ Records (§11, §6.12): every raw input in §6.12 except `tier`, `defect` and ha
 | `harness/scorecard.py` | pure | Per-task card and summary | §10 |
 | `harness/spool.py` | edge | State dir paths, lock, one-line appends, reads | §6.6, §9.3 |
 | `harness/gitio.py` | edge | Every git subprocess: info, code tree, fetch retry, push, rebase state | §6.11, §9.4 |
-| `harness/ghio.py` | edge | Every `gh` subprocess | §7 `pr`, §8 D |
+| `harness/ghio.py` | edge | Every `gh` subprocess | §7 `pr` |
 | `harness/taskfiles.py` | edge | Task folder paths, `state.json`/`config.json`, task lookup by branch, state-dir copies | §6.1–6.4, §6.6 |
 | `harness/context.py` | edge | Per-invocation context; builds and records CLI events | §6.7, §6.9 |
 | `harness/doctor.py` | edge | Silent-failure probes and runner; agent probes come from adapters | §8, R-22 |
@@ -2285,7 +2285,7 @@ git commit -m "feat: CLI dispatch with rebase and delegate guards; hook command"
 
 **Interfaces:**
 - Consumes: `dispatcher_path`, `adapters.REGISTRY` (`install_user`), `gitio`, `taskfiles.GITATTRIBUTES_LINE`
-- Produces: `install.render_dispatcher(python: str = sys.executable, repo: Path = REPO) -> str`; `install.PROJECT_DEFAULTS: dict`; `Sandbox` in `tests/helpers.py` with `tmp`, `home`, `env`, `remote`, `main`, `harness(*args, cwd, env=None, input=None)`, `worktree(branch) -> Path`, `hook(wt, event, session_id, env=None, **payload)`, `claude_session(wt, session_id, env=None) -> dict[str, str]`, `spool(wt) -> list[dict]`
+- Produces: `install.render_dispatcher(python: str = sys.executable, repo: Path = REPO) -> str`; `install.PROJECT_DEFAULTS: dict`; `commit(wt, message)` and `Sandbox` in `tests/helpers.py` with `tmp`, `home`, `env`, `remote`, `main`, `harness(*args, cwd, env=None, input=None)`, `worktree(branch) -> Path`, `hook(wt, event, session_id, env=None, **payload)`, `claude_session(wt, session_id, env=None) -> dict[str, str]`, `spool(wt) -> list[dict]`
 
 Spec: §4.1, §4.3 (both install commands; idempotent; prints each change), §6.2 (defaults), C7, R-8.
 
@@ -2316,6 +2316,11 @@ case "$1 $2" in
   *) echo "unexpected gh $*" >&2; exit 1 ;;
 esac
 """
+
+
+def commit(wt, message) -> None:
+    git(wt, "add", "-A")
+    git(wt, "commit", "-qm", message)
 
 
 class Sandbox:
@@ -3015,7 +3020,7 @@ git commit -m "feat: start --new registration and bootstrap start"
 
 **Interfaces:**
 - Consumes: `context`, `taskfiles`
-- Produces: `phase.PHASES`; `phase.enter(ctx, task_id: str, name: str) -> None`; `phase.exit_phase(ctx, task_id: str, name: str, handoff: bool = False) -> None`. Test helpers: `write_plan(wt, task_id, checks: dict[str, str | None], tier="M", goal="Add a greeting.")`; `commit(wt, message)`; `Sandbox.through_triage(slug, checks, tier="M", session="S1") -> (wt, env, task_id)`; `Sandbox.task_file_events(wt, task_id) -> list[dict]`
+- Produces: `phase.PHASES`; `phase.enter(ctx, task_id: str, name: str) -> None`; `phase.exit_phase(ctx, task_id: str, name: str, handoff: bool = False) -> None`. Test helpers: `write_plan(wt, task_id, checks: dict[str, str | None], tier="M", goal="Add a greeting.")`; `Sandbox.through_triage(slug, checks, tier="M", session="S1") -> (wt, env, task_id)`; `Sandbox.task_file_events(wt, task_id) -> list[dict]`
 
 Spec: §5.1 (contiguous phases: an `enter` on a still-open phase writes the missing exit first), §5.2 (triage enter gated on doctor; first build enter snapshots `plan.approved.md`), §6.3, §6.4, §6.6 (copies at triage exit), §6.9 (controlling session; manual commands record null), §7 `phase` row (refuses on the default branch, for delegates, and for triage without a passing check E), R-3.
 
@@ -3046,11 +3051,6 @@ def write_plan(wt, task_id, checks, tier="M", goal="Add a greeting.") -> None:
     taskfiles.write_json(folder / "config.json", {
         "knobs": {"phases": ["triage", "build"], "phase_agent": {}, "evaluator_cadence": "none", "plan_review": False},
         "record": {"tier": tier, "triage_signals": {}}})
-
-
-def commit(wt, message) -> None:
-    git(wt, "add", "-A")
-    git(wt, "commit", "-qm", message)
 ```
 
 Add to `class Sandbox`:
