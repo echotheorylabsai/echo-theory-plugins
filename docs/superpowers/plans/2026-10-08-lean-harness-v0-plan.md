@@ -271,7 +271,7 @@ Expected: `grep -c log_hook.py ~/.claude/settings.json ~/.codex/hooks.json` prin
 
 Spec: §12 adapter contract ("captured in Phase 0 from throwaway sessions"), §16 field list.
 
-- [ ] **Step 1: Run one Claude and one Codex session that each spawn a helper**
+- [ ] **Step 1: [YOU] Run one Claude and one Codex session that each spawn a helper** (each `codex exec` also writes a trust entry to `~/.codex/config.toml`; Task 0.6 removes it)
 
 ```bash
 cd ~/Desktop/src/echo-official/harness-phase0
@@ -382,7 +382,7 @@ print("sandbox:", os.environ.get("CODEX_SANDBOX"), "rc:", r.returncode, "stderr:
 print("MATCH" if r.stdout.decode().strip() == expected else "MISMATCH")
 ```
 
-- [ ] **Step 2: Run it natively, then inside a sandboxed `codex exec`**
+- [ ] **Step 2: [YOU] Run it natively, then inside a sandboxed `codex exec`** (writes a trust entry to `~/.codex/config.toml`; Task 0.6 removes it)
 
 ```bash
 cd ~/Desktop/src/echo-official/harness-phase0
@@ -491,7 +491,7 @@ Records (§11, §6.12): every raw input in §6.12 except `tier`, `defect` and ha
 | `tests/helpers.py` | test | Temp repos, CLI runner, `Sandbox` (fake HOME, bare remote, stub `gh`) | §12 |
 | `tests/test_*.py` | test | Unit, integration, adapter contract | §12 |
 
-Import rule: pure modules import only `harness.events`, `harness.planfile` and the standard library. Edge modules may import pure ones, never the reverse.
+Import rule: pure modules import only other pure modules and the standard library. Edge modules may import pure ones, never the reverse.
 
 ### Task 1.1: Package skeleton and event schema
 
@@ -3286,7 +3286,7 @@ Add to `class Sandbox`:
 import unittest
 
 from harness import gitio, spool, taskfiles
-from tests.helpers import Sandbox
+from tests.helpers import Sandbox, write_plan
 
 
 class PhaseTest(unittest.TestCase):
@@ -3342,6 +3342,15 @@ class PhaseTest(unittest.TestCase):
                           record["predicted_knobs"]), ("M", "baseline", gitio.harness_version(), "M", None))
         copies = spool.project_dir(self.sb.env, gitio.info(wt).common_dir) / "tasks" / task_id
         self.assertTrue((copies / "request.md").exists() and (copies / "config.json").exists())
+
+    def test_implicit_triage_exit_also_stamps_config(self):  # spec §5.1, R-3
+        wt, env, task_id = self.sb.begin_task("ph-implicit")
+        self.phase(wt, env, "triage", "enter")
+        write_plan(wt, task_id, {"C1": "true"})
+        self.assertEqual(self.phase(wt, env, "research", "enter").returncode, 0)
+        record = taskfiles.read_json(taskfiles.task_dir(wt, task_id) / "config.json")["record"]
+        self.assertEqual((record["arm"], record["origin_tier"]), ("baseline", "M"))
+        self.assertEqual(self.phases(wt, task_id), [("triage", "enter"), ("triage", "exit"), ("research", "enter")])
 
     def test_triage_exit_refuses_without_config(self):
         wt, env, task_id = self.sb.begin_task("ph-nocfg")
@@ -3421,6 +3430,8 @@ def enter(ctx, task_id: str, name: str) -> None:
     if snapshot and not (folder / "plan.md").exists():
         raise HarnessError("plan.md is missing; triage writes it")
     if state["phase_open"]:
+        if state["phase"] == "triage":
+            _finish_triage(ctx, task_id, folder)  # an implicit triage exit stamps and copies too (R-3, §6.6)
         _write(ctx, task_id, folder, state, state["phase"], "exit", False)  # phases are contiguous (§5.1)
     if snapshot:
         shutil.copyfile(folder / "plan.md", folder / "plan.approved.md")  # first build entry only (§5.2)
@@ -3477,7 +3488,7 @@ def _finish_triage(ctx, task_id: str, folder) -> None:
 - [ ] **Step 6: Run the tests to see them pass**
 
 Run: `python3.12 -m unittest tests.test_phase -v`
-Expected: 8 tests, OK.
+Expected: 9 tests, OK.
 
 - [ ] **Step 7: Commit**
 
@@ -4393,7 +4404,7 @@ git commit -m "feat: close --done and --abandon"
 
 **Interfaces:**
 - Consumes: `events.ts_ms`
-- Produces: `resolve.resolve(events: list[dict], task_branches: dict[str, str]) -> tuple[dict[str, list[dict]], list[dict]]` (events per task, orphans); `timing.Wall(total_ms: int, by_phase: dict[str, int], complete: bool, missing: list[str], running: bool)`; `timing.AgentTime(total_ms: int, by_phase: dict[str, int], unknown_spans: int)`; `timing.phase_intervals(events, until_ms) -> list[tuple[int, int, str]]`; `timing.wall(events, until_ms) -> Wall`; `timing.agent_time(events, until_ms) -> AgentTime`
+- Produces: `resolve.resolve(events: list[dict], task_branches: dict[str, str]) -> tuple[dict[str, list[dict]], list[dict]]` (events per task, orphans); `timing.Wall(total_ms: int, by_phase: dict[str, int], complete: bool, missing: list[str])`; `timing.AgentTime(total_ms: int, by_phase: dict[str, int], unknown_spans: int)`; `timing.phase_intervals(events, until_ms) -> list[tuple[int, int, str]]`; `timing.wall(events, until_ms) -> Wall`; `timing.agent_time(events, until_ms) -> AgentTime`
 
 Spec: §6.8 (resolution: task id, else branch, detached HEAD → session's last known branch; the rest are orphans), §6.10 (wall time with revisions and excluded human-wait gaps; startup charged; a missing boundary makes timing incomplete; agent time per session plus helpers; both per phase), R-1, R-2, R-18, R-19.
 
@@ -4456,7 +4467,7 @@ class WallTest(unittest.TestCase):
     def test_start_to_ready_split_by_phase(self):
         w = self.wall([ev("start", 0), ph(1, "triage", "enter"), ph(5, "triage", "exit"), ph(5, "build", "enter"),
                        ph(29, "build", "exit"), ev("ready", 30)])
-        self.assertEqual((w.total_ms, w.complete, w.running), (30 * MIN, True, False))
+        self.assertEqual((w.total_ms, w.complete), (30 * MIN, True))
         self.assertEqual(w.by_phase, {"between_phases": 2 * MIN, "triage": 4 * MIN, "build": 24 * MIN})
 
     def test_handoff_gap_is_excluded_until_the_successors_resume(self):  # spec §6.10
@@ -4492,7 +4503,7 @@ class WallTest(unittest.TestCase):
     def test_abandon_stops_and_in_flight_runs_to_until(self):
         self.assertEqual(self.wall([ev("start", 0), ev("close", 10, disposition="abandon")]).total_ms, 10 * MIN)
         w = self.wall([ev("start", 0), ph(1, "triage", "enter")], until=50)
-        self.assertEqual((w.total_ms, w.running), (50 * MIN, True))
+        self.assertEqual(w.total_ms, 50 * MIN)
 
 
 class AgentTimeTest(unittest.TestCase):
@@ -4554,7 +4565,6 @@ class Wall:
     by_phase: dict[str, int]
     complete: bool
     missing: list[str]
-    running: bool
 
 
 @dataclass(frozen=True)
@@ -4572,7 +4582,7 @@ def _pauses(e: dict) -> bool:
             or (kind == "close" and e.get("disposition") == "abandon"))
 
 
-def charged_intervals(events: list[dict], until_ms: int) -> tuple[list[tuple[int, int]], list[str], bool]:
+def charged_intervals(events: list[dict], until_ms: int) -> tuple[list[tuple[int, int]], list[str]]:
     intervals, missing = [], []
     started, running, since, resumes = False, False, 0, {}
     for e in events:
@@ -4597,7 +4607,7 @@ def charged_intervals(events: list[dict], until_ms: int) -> tuple[list[tuple[int
         missing.append("no start event")
     elif running:
         intervals.append((since, max(since, until_ms)))
-    return intervals, missing, running
+    return intervals, missing
 
 
 def phase_intervals(events: list[dict], until_ms: int) -> list[tuple[int, int, str]]:
@@ -4634,9 +4644,9 @@ def split_by_phase(spans: list[tuple[int, int]], phases: list[tuple[int, int, st
 
 
 def wall(events: list[dict], until_ms: int) -> Wall:
-    intervals, missing, running = charged_intervals(events, until_ms)
+    intervals, missing = charged_intervals(events, until_ms)
     return Wall(sum(b - a for a, b in intervals), split_by_phase(intervals, phase_intervals(events, until_ms)),
-                not missing, missing, running)
+                not missing, missing)
 
 
 def agent_time(events: list[dict], until_ms: int) -> AgentTime:
@@ -5057,6 +5067,10 @@ Expected: FAIL (`test_slice1_phase_files_exist`: empty set).
 every `harness` command in the task's worktree (the project), never here.
 
 ## Order
+
+If `.harness/runs/<task-id>/state.json` already names a `phase`, this is a later session of a task in
+progress: read `plan.md`, re-read that phase's file and continue from there (after a `ready`, begin
+with `harness phase build enter`, as `build.md` says). Otherwise:
 
 1. Run `harness phase triage enter`, then follow `skills/phases/triage.md`. Triage sets the tier.
 2. Run the phases your tier lists, in order. Read each phase file when you enter that phase.
