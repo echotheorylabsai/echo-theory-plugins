@@ -354,7 +354,7 @@ python3.12 -c "import json,glob; [print(f, json.load(open(f))['env']['PATH']) fo
 
 Expected: new `claude-*` and `codex-*` captures timestamped after Steps 1–2. Record for each app: hooks ran (yes/no), the hook process `PATH`, and the Bash `PATH` the agent printed, including whether it contains `~/.local/bin`.
 
-Fallbacks: if an app runs no user-level hooks, the fallback is "launch harness tasks from that agent's CLI only" (check E would fail there anyway). If an app's Bash `PATH` lacks `~/.local/bin`, stop and ask the user before Slice 1 (it changes how the bootstrap calls `harness`).
+Fallbacks: if an app runs no user-level hooks, the fallback is "launch harness tasks from that agent's CLI only" (the session probe would fail there anyway). If an app's Bash `PATH` lacks `~/.local/bin`, stop and ask the user before Slice 1 (it changes how the bootstrap calls `harness`).
 
 ### Task 0.5: `git hash-object -t tree` inside a sandboxed `codex exec`
 
@@ -423,7 +423,7 @@ Expected: `0` for both files; no `harness-phase0` lines; `codex hooks restored`.
 ### Task 0.7: Write the Phase 0 results into the spec
 
 **Files:**
-- Modify: `docs/superpowers/specs/2026-10-08-lean-harness-v0-product-spec.md` in `echotheorylabsai/echo-theory-plugins` (§11 Phase 0 row, §13 "Remaining" table, §16)
+- Modify: `docs/superpowers/specs/2026-10-08-lean-harness-v0-product-spec.md` in `echotheorylabsai/echo-theory-plugins` (§4.4, §7, §8, §11, §13, §16)
 
 Spec: §11 Phase 0 exit criteria ("written into this spec").
 
@@ -437,7 +437,7 @@ git worktree add ../echo-theory-plugins-phase0 -b claude/lean-harness-phase0-res
 - [ ] **Step 2: Edit the spec**
   - §11 Phase 0 "Adds" cell: replace "`install --user` dry run there" with "a temporary hand-added logging hook for the user-level hook checks (removed afterwards; `install --user` is first exercised in Slice 1)".
   - §13 "Remaining" table: for the desktop-app row and the `hash-object` row, state the Phase 0 result (confirmed, or the fallback chosen) with the date.
-  - §8: replace the group table with R-22's list of checks, and note the dropped ones fail loudly at use (your direction); in §7, §11 and §13, replace the A–E references with "install probes", "pre-start probes" and "session probe".
+  - §8: replace the group table with R-22's list of checks, and note the dropped ones fail loudly at use (your direction); in §4.4, §7, §8's opening paragraph, §11 and §13, replace the A–E references with "install probes", "pre-start probes" and "session probe".
   - §16: add a "Phase 0 (date)" paragraph: fixture fields that differ from §16 (if any), desktop-app hook results, hook and Bash `PATH` per app, the `hash-object` result.
 
 - [ ] **Step 3: Commit and push**
@@ -487,7 +487,7 @@ Records (§11, §6.12): every raw input in §6.12 except `tier`, `defect` and ha
 | `harness/cli.py` | edge | Dispatch table and its two guards | §7, §9.5, §9.7 |
 | `harness/commands/{hook,install,doctor,start,phase,check,rebase,pr,close,score}.py` | edge | One file per CLI command | §7 |
 | `harness/adapters/__init__.py` | — | Adapter registry dict | §15 |
-| `harness/adapters/claude.py` | edge | Claude identity var, payload → event, §6.9 markers, user install, doctor probes | §4.3, §6.9, §8 B |
+| `harness/adapters/claude.py` | edge | Claude identity var, payload → event, §6.9 markers, user install, doctor probes | §4.3, §6.9, §8 (install probes) |
 | `bin/harness` | — | Dispatcher template (`@PYTHON@`, `@HARNESS_REPO@`) | §4.1 |
 | `hooks/bootstrap.md` | — | The fixed bootstrap text | §4.4 |
 | `AGENTS.md`, `skills/phases/{triage,research,resolve,plan,build,verify}.md` | — | Map and Slice 1 phase files | §4.2, §5.2 |
@@ -1593,7 +1593,7 @@ git commit -m "feat: task folder files and task lookup"
 - Produces: `adapters.REGISTRY: dict[str, module]`; `adapters.identity_vars() -> dict[str, str]`; `adapters.foreign_vars(name: str) -> list[str]`. Every adapter module defines: `NAME: str`; `IDENTITY_VAR: str`; `HOOK_EVENTS: dict[str, str]` (hook event → event kind); `to_event(hook_event: str, payload: dict, env: Mapping, foreign_vars: list[str]) -> tuple[dict, list[str]]` (fields including `kind`, without git fields; and the missing-field list); `on_event(hook_event, payload, env, lookup_task: Callable[[], str | None], foreign_vars) -> None`; `install_user(home: Path, dispatcher: Path) -> list[str]` (changes made); `doctor_probes() -> list[Callable]` (checks that catch silent failures only, R-22). A probe is `probe(ctx, task_id) -> tuple[str, bool, str]` (name, ok, fix) and may raise `HarnessError`.
 - Claude extras: `claude.markers(payload_session_id: str, env, task_id: str | None, foreign_vars) -> dict[str, str]`; `claude.parent_session(payload_session_id, env, foreign_vars) -> str | None`; `claude.IMPORT_LINE`; `claude.ALLOW_RULE`; `claude.BOOTSTRAP_COPY`
 
-Spec: §4.1 and §4.3 (user-scope files, append-only install, allow rule), §4.4 (bootstrap text), §6.7 (`model` null in Claude hooks; `effort` from Stop/SubagentStop `effort.level`; transcript paths, C15), §6.9 (markers, parent derivation), §8 B (Claude probes), §12 (adapter contract: a changed payload gives `format_warning`, never a crash), R-20.
+Spec: §4.1 and §4.3 (user-scope files, append-only install, allow rule), §4.4 (bootstrap text), §6.7 (`model` null in Claude hooks; `effort` from Stop/SubagentStop `effort.level`; transcript paths, C15), §6.9 (markers, parent derivation), §8 and R-22 (Claude install probes), §12 (adapter contract: a changed payload gives `format_warning`, never a crash), R-20.
 
 - [ ] **Step 1: Write the bootstrap text (fixed, §4.4)**
 
@@ -1686,7 +1686,7 @@ class ClaudeAdapterTest(unittest.TestCase):
                          (REPO / "hooks" / "bootstrap.md").read_text())
         self.assertEqual(claude.install_user(self.home, self.dispatcher), [])
 
-    def test_doctor_probes_fail_before_install_and_pass_after(self):  # spec §8 B, R-22
+    def test_doctor_probes_fail_before_install_and_pass_after(self):  # spec §8, R-22
         ctx = SimpleNamespace(home=self.home)
         before = [fn(ctx, None) for fn in claude.doctor_probes()]
         self.assertEqual([(name, ok) for name, ok, _ in before], [("claude_hooks", False), ("claude_bootstrap", False)])
@@ -2281,7 +2281,7 @@ git commit -m "feat: CLI dispatch with rebase and delegate guards; hook command"
 
 **Files:**
 - Create: `harness/commands/install.py`, `tests/test_install.py`
-- Modify: `harness/cli.py` (register `install`), `tests/helpers.py` (add `GH_STUB`, `Sandbox`)
+- Modify: `harness/cli.py` (register `install`), `tests/helpers.py` (add `GH_STUB`, `commit`, `Sandbox`)
 
 **Interfaces:**
 - Consumes: `dispatcher_path`, `adapters.REGISTRY` (`install_user`), `gitio`, `taskfiles.GITATTRIBUTES_LINE`
@@ -2309,8 +2309,6 @@ import tempfile
 GH_STUB = """#!/bin/sh
 echo "$*" >> "$GH_LOG"
 case "$1 $2" in
-  "auth status") exit 0 ;;
-  "repo view") echo ADMIN ;;
   "pr create") echo "https://github.com/o/r/pull/$(grep -c '^pr create' "$GH_LOG")" ;;
   "pr edit") exit 0 ;;
   *) echo "unexpected gh $*" >&2; exit 1 ;;
@@ -2533,12 +2531,12 @@ git commit -m "feat: install --user and project install; test sandbox"
 ### Task 1.10: `doctor`
 
 **Files:**
-- Create: `harness/ghio.py`, `harness/doctor.py`, `harness/commands/doctor.py`, `tests/test_doctor.py`
+- Create: `harness/doctor.py`, `harness/commands/doctor.py`, `tests/test_doctor.py`
 - Modify: `harness/cli.py` (register `doctor`)
 
 **Interfaces:**
 - Consumes: `context.Ctx`, `adapters.REGISTRY` (`doctor_probes`), `gitio`, `spool`, `taskfiles`
-- Produces: `ghio.pr_create(cwd, base, head, title, body) -> tuple[int, str]`; `ghio.pr_edit_body(cwd, number, body) -> None`; `doctor.LIVE_WINDOW_MS`; every `doctor.probe_*(ctx, task_id) -> tuple[str, bool, str]`; `doctor.PRE_START: list`; `doctor.agent_install() -> list`; `doctor.run(probes, ctx, task_id=None) -> list[tuple[str, bool, str]]`; `doctor.passed(results) -> bool`; `doctor.format(results) -> str`
+- Produces: `doctor.LIVE_WINDOW_MS`; every `doctor.probe_*(ctx, task_id) -> tuple[str, bool, str]`; `doctor.PRE_START: list`; `doctor.agent_install() -> list`; `doctor.run(probes, ctx, task_id=None) -> list[tuple[str, bool, str]]`; `doctor.passed(results) -> bool`; `doctor.format(results) -> str`
 
 Spec: §8 as narrowed by R-22 (only checks that catch silent failures or record discrepancies; three entry points; read-only), §4.7, §9.1, C9, R-11, R-12, R-16.
 
@@ -2606,31 +2604,6 @@ Expected: FAIL with `ImportError: cannot import name 'doctor'`.
 
 - [ ] **Step 4: Write the implementation**
 
-`harness/ghio.py`:
-
-```python
-"""GitHub CLI edge: every `gh` subprocess (spec §7 `pr`). Edge."""
-import subprocess
-
-from harness import HarnessError
-
-
-def _ok(args: list[str], cwd) -> str:
-    r = subprocess.run(["gh", *args], cwd=cwd, capture_output=True, text=True)
-    if r.returncode != 0:
-        raise HarnessError(f"gh {' '.join(args[:2])} failed: {r.stderr.strip()}")
-    return r.stdout.strip()
-
-
-def pr_create(cwd, base: str, head: str, title: str, body: str) -> tuple[int, str]:
-    url = _ok(["pr", "create", "--base", base, "--head", head, "--title", title, "--body", body], cwd).splitlines()[-1]
-    return int(url.rstrip("/").rsplit("/", 1)[1]), url
-
-
-def pr_edit_body(cwd, number: int, body: str) -> None:
-    _ok(["pr", "edit", str(number), "--body", body], cwd)
-```
-
 `harness/doctor.py`:
 
 ```python
@@ -2638,17 +2611,11 @@ def pr_edit_body(cwd, number: int, body: str) -> None:
 from harness import HarnessError, events, gitio, spool, taskfiles
 from harness.adapters import REGISTRY
 
-LIVE_WINDOW_MS = 10 * 60 * 1000  # "in the last few minutes" (§8 E)
-
-
-def _project(ctx) -> dict:
-    if ctx.project is None:
-        raise HarnessError("no .harness/project.json: run `harness install` here and merge its PR")
-    return ctx.project
+LIVE_WINDOW_MS = 10 * 60 * 1000  # "in the last few minutes" (§8, session probe)
 
 
 def _integration_ref(ctx) -> str:
-    p = _project(ctx)
+    p = ctx.require_project()
     return f"{p['integration_remote']}/{p['default_branch']}"
 
 
@@ -2660,7 +2627,7 @@ def probe_not_cloud(ctx, task_id):
 
 def probe_task_branch(ctx, task_id):
     branch = ctx.git.branch if ctx.git else None
-    ok = branch is not None and branch != _project(ctx)["default_branch"]
+    ok = branch is not None and branch != ctx.require_project()["default_branch"]
     return "task_branch", ok, "git worktree add <path> -b <branch> origin/<default branch>, then cd there"
 
 
@@ -2669,15 +2636,15 @@ def probe_clean(ctx, task_id):
 
 
 def probe_up_to_date(ctx, task_id):
-    p = _project(ctx)
+    p = ctx.require_project()
     gitio.fetch(ctx.root, p["integration_remote"], p["default_branch"])
     extra = gitio.out(["rev-list", "HEAD", "--not", _integration_ref(ctx)], ctx.root)
     return "up_to_date", extra == "", "create the worktree from fresh origin/<default branch>"
 
 
 def probe_unused(ctx, task_id):
-    """Branch and task id never used: integration branch, this branch, spool (spec §8 D, §9.1)."""
-    p, branch = _project(ctx), ctx.git.branch
+    """Branch and task id never used: integration branch, this branch, spool (spec §8, §9.1)."""
+    p, branch = ctx.require_project(), ctx.git.branch
     starts = [e for e in spool.read(ctx.state_dir) if e.get("kind") == "start"]
     used = (any(e.get("branch") == branch for e in starts)
             or gitio.remote_branch_exists(ctx.root, p["integration_remote"], branch))
@@ -2755,8 +2722,8 @@ Expected: 3 tests, OK.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add harness/ghio.py harness/doctor.py harness/commands/doctor.py harness/cli.py tests/test_doctor.py
-git commit -m "feat: doctor with silent-failure probes; gh edge"
+git add harness/doctor.py harness/commands/doctor.py harness/cli.py tests/test_doctor.py
+git commit -m "feat: doctor with silent-failure probes"
 ```
 
 ### Task 1.11: `start --new` and bootstrap `start`
@@ -2898,7 +2865,7 @@ class BootstrapTest(unittest.TestCase):
         self.assertIn(f"delegate of task {task_id}: follow your prompt", r.stdout)
         self.assertEqual(len(self.sb.spool(wt)), before)
 
-    def test_session_without_hooks_fails_check_e(self):  # spec §8 E
+    def test_session_without_hooks_fails_check_e(self):  # spec §8 session probe
         wt = self.sb.worktree("task-nohooks")
         request = self.sb.tmp / "nohooks.md"
         request.write_text("x\n")
@@ -3016,13 +2983,13 @@ git commit -m "feat: start --new registration and bootstrap start"
 
 **Files:**
 - Create: `harness/commands/phase.py`, `tests/test_phase.py`
-- Modify: `harness/cli.py` (register `phase`), `tests/helpers.py` (add `write_plan`, `commit`, `Sandbox.through_triage`, `Sandbox.task_file_events`)
+- Modify: `harness/cli.py` (register `phase`), `tests/helpers.py` (add `write_plan`, `Sandbox.through_triage`, `Sandbox.task_file_events`)
 
 **Interfaces:**
 - Consumes: `context`, `taskfiles`
 - Produces: `phase.PHASES`; `phase.enter(ctx, task_id: str, name: str) -> None`; `phase.exit_phase(ctx, task_id: str, name: str, handoff: bool = False) -> None`. Test helpers: `write_plan(wt, task_id, checks: dict[str, str | None], tier="M", goal="Add a greeting.")`; `Sandbox.through_triage(slug, checks, tier="M", session="S1") -> (wt, env, task_id)`; `Sandbox.task_file_events(wt, task_id) -> list[dict]`
 
-Spec: §5.1 (contiguous phases: an `enter` on a still-open phase writes the missing exit first), §5.2 (triage enter gated on doctor; first build enter snapshots `plan.approved.md`), §6.3, §6.4, §6.6 (copies at triage exit), §6.9 (controlling session; manual commands record null), §7 `phase` row (refuses on the default branch, for delegates, and for triage without a passing check E), R-3.
+Spec: §5.1 (contiguous phases: an `enter` on a still-open phase writes the missing exit first), §5.2 (triage enter gated on doctor; first build enter snapshots `plan.approved.md`), §6.3, §6.4, §6.6 (copies at triage exit), §6.9 (controlling session; manual commands record null), §7 `phase` row (refuses on the default branch, for delegates, and for triage without a passing session probe), R-3.
 
 - [ ] **Step 1: Register the command**
 
@@ -3798,12 +3765,12 @@ git commit -m "feat: rebase with conflict rerun flow"
 ### Task 1.16: `pr` and `pr --refresh`
 
 **Files:**
-- Create: `harness/commands/pr.py`, `tests/test_pr.py`
+- Create: `harness/ghio.py`, `harness/commands/pr.py`, `tests/test_pr.py`
 - Modify: `harness/cli.py` (register `pr`)
 
 **Interfaces:**
 - Consumes: `phase.enter/exit_phase`, `check.run_one`, `rebase.rebase/abort`, `gate.needs_build_enter/failing_checks`, `planfile`, `ghio.pr_create/pr_edit_body`, `gitio.commit_paths/push/code_tree`
-- Produces: `pr.publish(ctx, project, task_id) -> int`; `pr.refresh(ctx, project, task_id) -> int`; `pr.pr_body(task_id, plan, scope) -> str`; `pr.title(plan, task_id) -> str`
+- Produces: `ghio.pr_create(cwd, base, head, title, body) -> tuple[int, str]`; `ghio.pr_edit_body(cwd, number, body) -> None`; `pr.publish(ctx, project, task_id) -> int`; `pr.refresh(ctx, project, task_id) -> int`; `pr.pr_body(task_id, plan, scope) -> str`; `pr.title(plan, task_id) -> str`
 
 Spec: §5.2 (PR row; after `ready`: re-entry, re-emit without a second PR, `--refresh` before merging), §6.7 `ready` and `pr` fields, §7 `pr` and `pr --refresh` rows, parent (scope-reduction flag in the PR; a failed final push is finished with `git push <remote> HEAD`; a `ready` writes the missing exit first), R-1, R-14, R-15.
 
@@ -3940,6 +3907,31 @@ Expected: FAIL (`pr` is not a registered command).
 
 - [ ] **Step 4: Write the implementation**
 
+`harness/ghio.py`:
+
+```python
+"""GitHub CLI edge: every `gh` subprocess (spec §7 `pr`). Edge."""
+import subprocess
+
+from harness import HarnessError
+
+
+def _ok(args: list[str], cwd) -> str:
+    r = subprocess.run(["gh", *args], cwd=cwd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise HarnessError(f"gh {' '.join(args[:2])} failed: {r.stderr.strip()}")
+    return r.stdout.strip()
+
+
+def pr_create(cwd, base: str, head: str, title: str, body: str) -> tuple[int, str]:
+    url = _ok(["pr", "create", "--base", base, "--head", head, "--title", title, "--body", body], cwd).splitlines()[-1]
+    return int(url.rstrip("/").rsplit("/", 1)[1]), url
+
+
+def pr_edit_body(cwd, number: int, body: str) -> None:
+    _ok(["pr", "edit", str(number), "--body", body], cwd)
+```
+
 `harness/commands/pr.py`:
 
 ```python
@@ -4047,7 +4039,7 @@ Expected: 6 tests, OK.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add harness/commands/pr.py harness/cli.py tests/test_pr.py
+git add harness/ghio.py harness/commands/pr.py harness/cli.py tests/test_pr.py
 git commit -m "feat: pr publish and refresh"
 ```
 
@@ -5164,7 +5156,8 @@ def main() -> int:
     bindir.mkdir()
     (bindir / "gh").write_text(GH_STUB)
     (bindir / "gh").chmod(0o755)
-    env = {k: v for k, v in os.environ.items() if not k.startswith("HARNESS_")}
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith("HARNESS_") and k not in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY")}  # use your subscription login
     env.update(PATH=f"{bindir}:{os.environ['PATH']}", GH_LOG=str(tmp / "gh.log"))
     remote, main_co, merger, wt = tmp / "remote.git", tmp / "main", tmp / "merger", tmp / "task"
     sh("git", "clone", "-q", "--bare", str(init_repo(tmp / "seed")), str(remote), cwd=tmp, env=env)
