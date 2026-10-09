@@ -166,14 +166,14 @@ You, in a terminal:
      git worktree add <path> -b <branch> origin/main
   2. cd <path>
      harness start --new <slug> --benchmark-tier S|M|L --request ~/tasks/<slug>.md   (file OUTSIDE the worktree)
-       → doctor checks A–D (§8); any failure: prints the fix, registers nothing, no clock
+       → install probes and pre-start probes (§8); any failure: prints the fix, registers nothing, no clock
        → passes: mints <date>-<slug>, creates .harness/runs/<task-id>/ (request.md verbatim,
          state.json), records assignment (arm "baseline", assigned commit = harness repo HEAD),
          appends `start` (clock starts), prints the harness checkout path
 Launch an agent IN THAT WORKTREE: claude / codex CLI, or open the folder in either app.
 Codex must be launched with full access (`-s danger-full-access`, or the app's full-access setting).
   3. Bootstrap: the agent runs `harness start`
-       → resolves the task by branch, runs doctor (E plus a fast subset of A–C), appends `resume`, prints the checkout
+       → resolves the task by branch, runs doctor (session probe, install probes, not-cloud probe), appends `resume`, prints the checkout
   4. The agent reads AGENTS.md from that checkout → `harness phase triage enter` → … → `harness pr`
 ```
 
@@ -504,10 +504,10 @@ retroactively for every task recorded since its raw data started.
 |---|---|---|---|---|
 | `install --user` | You | User-scope install (§4.3) | `AGENTS.override.md` in `$CODEX_HOME` | 1 (Codex parts 2) |
 | `install` | You | Project files on a branch | Not a git repo | 1 |
-| `doctor` | Anyone | Checks A–E, read-only | — | 1 (Codex checks 2) |
-| `start --new <slug> --benchmark-tier T --request F` | You | §4.4 step 2; holds the spool lock across uniqueness check, assignment and `start` | Any check A–D fails | 1 |
-| `start` | Bootstrap | Resolve task, check E, `resume`, print checkout | (silent no-op outside a task; delegates: prints delegate notice) | 1 |
-| `phase <name> enter\|exit [--handoff]` | Controlling session (you for manual build enter) | `state.json` + phase event; first `build enter` snapshots `plan.approved.md` | Default branch; delegate; triage without a passing check E | 1 |
+| `doctor` | Anyone | Install, pre-start and session probes (§8), read-only | — | 1 (Codex checks 2) |
+| `start --new <slug> --benchmark-tier T --request F` | You | §4.4 step 2; holds the spool lock across uniqueness check, assignment and `start` | An install or pre-start probe fails | 1 |
+| `start` | Bootstrap | Resolve task, install probes, not-cloud probe, session probe, `resume`, print checkout | (silent no-op outside a task; delegates: prints delegate notice) | 1 |
+| `phase <name> enter\|exit [--handoff]` | Controlling session (you for manual build enter) | `state.json` + phase event; first `build enter` snapshots `plan.approved.md` | Default branch; delegate; triage without a passing session probe | 1 |
 | `check [--task ID] <C-id>\|--all [--observed pass\|fail]` | Any session or delegate | Runs the check's fenced command from `plan.md` (or records an observation); code tree and check-text hash | Code checkout not clean outside `.harness/` before or after | 1 |
 | `rebase` | Build phase; `pr --refresh` | Commit `.harness/`, fetch (retry on lock), `rebase --merge`, by-id memory cleanup, conflict rerun flow (parent) | Uncommitted changes outside `.harness/` (unless a rebase it started is stopped) | 1 (memory cleanup 2) |
 | `pr <task-id>` | Controlling session | Gate pre-check, commit `.harness/`, push (`--set-upstream`; `--force-with-lease` after a rebase), `gh pr create`, `ready` + `pr`, commit, push | Failing or stale checks; no `triage enter`; delegate | 1 |
@@ -528,21 +528,25 @@ relaunch Codex with full access); none drops an event silently.
 
 ## 8. Pre-start validation: `harness doctor` (R3)
 
-One check module, three entry points: `harness doctor` (any time; read-only; writes nothing),
-`harness start --new` (A–D before registering anything), and `harness start` at bootstrap (E plus a
-fast subset of A–C; appends one `doctor` event). `harness phase triage enter` refuses unless the latest
-`doctor` event for this task, from the issuing session, passed.
+One probe module, three entry points: `harness doctor` (any time; read-only; writes no harness
+records), `harness start --new` (install probes and pre-start probes before registering anything), and
+`harness start` at bootstrap (install probes, the not-cloud probe and the session probe; appends one
+`doctor` event). `harness phase triage enter` refuses unless the latest `doctor` event for this task,
+from the issuing session, passed.
 
-| Group | Checks |
+Doctor keeps only probes that catch a silent failure or a record discrepancy (owner direction,
+2026-10-08: keep doctor minimal). Hard dependencies fail loudly where they are used instead, so doctor
+does not repeat them: Python version, git, gh, `gh auth`, repository permission, push access, state dir
+writability, `harness` on PATH, `project.json` validity, `.gitattributes`, the allow rule.
+
+| Probe set | Checks |
 |---|---|
-| A. Machine | Python ≥ 3.12; git and gh present; `gh auth status` ok; state dir writable; `harness` on PATH is the installed dispatcher |
-| B. Agent install | Claude: hook entries, bootstrap import, allow rule present; `disableAllHooks` not true. Codex: hook entries present; `[features].hooks` not false; a `hooks.state` approval for each harness hook entry; the state dir in `[sandbox_workspace_write].writable_roots`; bootstrap block present; no `$CODEX_HOME/AGENTS.override.md` |
-| C. Project | `project.json` valid and present on the fetched integration branch; `.gitattributes` union line |
-| D. Task | Not a cloud session; inside a git worktree, not on the default branch; `git status --porcelain` empty; branch name and task id never used (integration branch, this branch, spool); `git fetch` of the integration ref succeeds; no commits outside the fetched integration branch; `gh repo view --json viewerPermission` is WRITE, MAINTAIN or ADMIN; `git push --dry-run --no-verify <remote> HEAD:refs/heads/<branch>` succeeds |
-| E. Session (live) | This session's own hook events reached the spool in the last few minutes, matched by its identity (§6.9), which must be present; Codex: `CODEX_SANDBOX` unset (full access) |
+| Install probes | Claude: hook entries present and enabled (`disableAllHooks` not true); bootstrap import present. Codex (Slice 2): hook entries present; `[features].hooks` not false; a `hooks.state` approval for each harness hook entry; the state dir in `[sandbox_workspace_write].writable_roots`; bootstrap block present; no `$CODEX_HOME/AGENTS.override.md` |
+| Pre-start probes | Not a cloud session; on a task branch (inside a git worktree, not the default branch); `git status --porcelain` empty; started from the fetched integration branch (`git fetch` of the integration ref succeeds, no commits outside it); branch name and task id never used (integration branch, this branch, spool) |
+| Session probe (live) | This session's own hook events reached the spool in the last few minutes, matched by its identity (§6.9), which must be present; Codex: `CODEX_SANDBOX` unset (full access) |
 
-A failure in `start --new` registers nothing. A failure in E stops the agent before triage with the
-fix printed; the task stays in flight and its clock keeps running; you fix and relaunch.
+A failure in `start --new` registers nothing. A failure in the session probe stops the agent before
+triage with the fix printed; the task stays in flight and its clock keeps running; you fix and relaunch.
 Environment failures are independent of the arm, so they add noise, not bias.
 
 ---
@@ -596,8 +600,8 @@ next starts.
 
 | Stage | Adds | Records | Exit criteria |
 |---|---|---|---|
-| **Phase 0** (short) | Capture hook-payload fixtures from both agents in a throwaway repo; `install --user` dry run there; confirm Claude desktop and Codex app sessions run the user-level hooks; confirm `git hash-object -t tree` runs inside a sandboxed `codex exec` | — | Each item confirmed, or its fallback chosen and written into this spec |
-| **Slice 1: one measured task (Claude)** | Spool, event schema v1, Claude adapter, `install`, `doctor` (A–E, Claude), `start`, `phase`, `check`, `rebase` (no memory cleanup), `pr`, `pr --refresh`, `close`, `score` (resolution, gate, timing, agent time, coverage); phase files triage, research, resolve, plan, build, verify; `AGENTS.md` | Every raw input in §6.12 except `tier`, `defect` and harness memory events | One real mvp M task merged with a complete scorecard (all boundaries present, gate evaluated, no unexplained orphans); two tasks in parallel in mvp scored correctly |
+| **Phase 0** (short) | Capture hook-payload fixtures from both agents in a throwaway repo; a temporary logging hook loaded per run (`claude -p --settings`) for the payload capture (removed afterwards); the desktop-app hook check by evidence from a desktop session (`install --user` is first exercised in Slice 1); confirm Claude desktop and Codex app sessions run the user-level hooks; confirm `git hash-object -t tree` runs inside a sandboxed `codex exec` | — | Each item confirmed, or its fallback chosen and written into this spec |
+| **Slice 1: one measured task (Claude)** | Spool, event schema v1, Claude adapter, `install`, `doctor` (install, pre-start and session probes, Claude), `start`, `phase`, `check`, `rebase` (no memory cleanup), `pr`, `pr --refresh`, `close`, `score` (resolution, gate, timing, agent time, coverage); phase files triage, research, resolve, plan, build, verify; `AGENTS.md` | Every raw input in §6.12 except `tier`, `defect` and harness memory events | One real mvp M task merged with a complete scorecard (all boundaries present, gate evaluated, no unexplained orphans); two tasks in parallel in mvp scored correctly |
 | **Slice 2: both agents, all phases (ready for real work)** | Codex adapter and install (hooks, approval step, writable root, bootstrap); retro phase, `retro-bundle`, harness memory, `memory`, `rebase` by-id cleanup; `tier`, `review`, `defect`; transcript cache | Everything in §6.12 | Claude and Codex tasks running concurrently in mvp; at least one echo-wiki task; a Claude task whose verify ran in a Codex delegate, with the delegate's check recorded; two parallel tasks' lessons merged cleanly; scorecards complete for all |
 | **Slice 3: full scorecard** | All seven metrics, tokens and dollars, topology rebuild, summary with spread per tier, note-line validation | — | Scorecards recomputed for every task since Slice 1; three tasks hand-checked against the scorer |
 | **v1: comparisons** | §2.3 first row | — | Parent design's Fair comparison rules |
@@ -618,8 +622,9 @@ spans and memory events; they prove the instrumentation and stay outside any v1 
   under parallel appends; fetch retry under concurrent fetches; union merge plus by-id cleanup across
   two branches; `rebase` conflict stop and rerun; `pr` and `pr --refresh` against a local bare remote
   with a stubbed `gh`; gate across merge, squash and rebase merges.
-- **Adapter contract:** real Claude and Codex hook payloads, captured in Phase 0 from throwaway
-  sessions (the 2026-10-08 captures were not kept; §16 lists their fields), stored as fixtures; a changed
+- **Adapter contract:** real Claude and Codex hook payloads from throwaway sessions (Claude captured in
+  Phase 0, 2026-10-09; Codex captured at the start of Slice 2; the 2026-10-08 captures were not kept and
+  §16 lists their fields), stored as fixtures; a changed
   payload must produce a `format_warning`, never a crash. Remove the trust entries `codex exec` adds for
   throwaway folders afterwards (§16).
 - **End-to-end smoke:** one scripted task in a throwaway repo driven by real `claude -p` and
@@ -646,8 +651,10 @@ to a file in a writable root; after `claude --resume`, SessionStart fires again 
 
 | Unknown | Safety net |
 |---|---|
-| Whether the Codex desktop app (and the Claude desktop app) run user-level hooks | Phase 0 checks it; at runtime check E fails before triage if this session's hooks never reach the spool |
-| `git hash-object -t tree` inside a seatbelt sandbox | Phase 0; the fallback is to compute the tree hash in Python |
+| Whether the Codex desktop app runs user-level hooks | Not checked in Phase 0; deferred to the start of Slice 2 with the Codex adapter. At runtime the session probe fails before triage if this session's hooks never reach the spool |
+| Whether a user-level hook entry runs in the Claude desktop app, and its hook-process `PATH` | Phase 0 (2026-10-09): plugin SessionStart hooks fired in a desktop-app Code-tab session, so hooks run; a user-level entry was not exercised and the hook-process `PATH` was not captured (hook entries use absolute paths). The session probe is the net |
+| Codex hook payload fixtures | Not captured in Phase 0 (the permission classifier refused a full-access `codex exec` that bypasses hook trust); deferred to the start of Slice 2. Slice 1 is Claude-only |
+| `git hash-object -t tree` inside a seatbelt sandbox | Phase 0 (2026-10-09): confirmed. Inside `codex exec -s workspace-write` (`CODEX_SANDBOX=seatbelt`) it exits 0 and the hash matches `HEAD^{tree}`; no fallback needed |
 | Transcript formats change | Readers are best-effort; fields go null and coverage drops; nothing else depends on them |
 
 ---
@@ -716,6 +723,24 @@ with `parent_thread_id` and depth.
 **git 2.54 and GitHub.** `rebase --merge` honors `merge=union`; concurrent fetches across worktrees of
 one repo fail on ref locks about half the time; the account is ADMIN on `echotheorylabsai/mvp` and
 `echotheorylabsai/echo-wiki`.
+
+**Phase 0 (2026-10-09).** Claude Code 2.1.295 payloads for all six events (SessionStart,
+UserPromptSubmit, SubagentStart, SubagentStop, Stop, SessionEnd) were captured from a throwaway
+`claude -p` session that ran a subagent. The hooks were loaded for that run with
+`claude -p --settings <file>` instead of the user settings file (the session's permission classifier
+refused the user-settings edit); it is the same hook engine. Fields match the paragraph above, with
+these additions: every event except SessionStart carries `prompt_id`; Stop and SubagentStop carry
+`effort.level`; SessionEnd `reason` was `other` for a `-p` run. Extra fields seen and ignored:
+`scratchpad_dir`, `permission_mode`, `background_tasks`, `session_crons`, `stop_hook_active`,
+`last_assistant_message`. Codex fixtures were not captured (see §13).
+Claude desktop app (Code tab): hooks run (plugin SessionStart hooks fired in a desktop-app session);
+this evidence came from a desktop session whose bundled Claude Code was 2.1.293 (the CLI fixtures were 2.1.295).
+The agent's Bash `PATH` contains `~/.local/bin`, and `python3.12` resolves to
+`/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12`. A user-level hook entry was not
+exercised and the hook-process `PATH` was not captured, so hook entries call the dispatcher by absolute
+path. Codex app: not checked, deferred to Slice 2.
+`git hash-object -t tree --stdin` (no `-w`) inside a sandboxed `codex exec -s workspace-write`
+(`CODEX_SANDBOX=seatbelt`): exit 0, hash equals `HEAD^{tree}`. The harness uses `git hash-object`.
 
 ---
 
