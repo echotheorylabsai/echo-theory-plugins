@@ -62,12 +62,12 @@ Type: **O** = override, **A** = added, **D** = deferred to v1 or later.
 |---|---|---|---|---|
 | C1 | Native memory off: install merges `autoMemoryEnabled: false`, Codex `[features].memories` must be off, events record the resolved setting, memory "on or unknown" makes a time result descriptive | Native agent memory is out of scope: never disabled, checked or recorded | O | User decision. Disclosed trade-off: native memory may carry context across arms; both arms share it, so it adds noise, not bias toward an arm |
 | C2 | Harness-defined subagents (explorer, evaluator, retro) installed at user scope with `omitClaudeMd` | None shipped | O | Topology is the model's choice; less to install and keep in sync |
-| C3 | `config.json` knob "topology (how many in parallel, with role labels)"; per-phase requested model and effort | Topology, model and effort are recorded from observation only; scorer roles are the observed agent types | O | Observe-only topology (§5.4) |
+| C3 | `config.json` knob "topology (how many in parallel, with role labels)"; per-phase requested model and effort; agent types mapped to knob role labels (`unconfigured`, `evaluator`) | Topology, model and effort are recorded from observation only; scorer roles are the observed agent types; a verifier is identified by its session, not a role label | O | Observe-only topology (§5.4) |
 | C4 | Research uses parallel explorers; verify uses "a separate evaluator"; retro uses "a fresh agent" | Outcomes, not mechanisms: verify by an agent other than the builder; retro from a fresh context given only the retro bundle; the main agent chooses how | O | User chose option A |
 | C5 | Controlling session id "from the agent's session env var, else the adapter's SessionStart record for the same working directory, else null" | Claude: `HARNESS_SESSION_ID` written by the harness's own SessionStart handler; Codex: `CODEX_THREAD_ID`; no folder fallback; null only for your manual commands | O | `CLAUDE_CODE_SESSION_ID` may hold the startup id after `claude --continue` (Claude docs); folder matching misattributes concurrent sessions |
 | C6 | Codex adapter adds sandbox writable roots and network/escalation access | Codex main sessions run with full access chosen at launch; install adds only the state dir to `[sandbox_workspace_write].writable_roots` so sandboxed Codex delegates can record | O | User decision; tested |
 | C7 | Project install also writes agent settings | Project install writes only `.harness/project.json` and the `.gitattributes` union line | O | Follows from C1 and C6 |
-| C8 | Tokens and dollars "where exposed, else null" | Read best-effort from agent transcripts (Claude: tokens and dollars; Codex: tokens) and cached in the state dir | O | Tested: transcripts carry them; hooks do not |
+| C8 | Tokens and dollars "where exposed, else null", each usage value scoped complete or partial | Read best-effort from agent transcripts (Claude: tokens and dollars; Codex: tokens), complete per message, and cached in the state dir; the complete/partial scope rule is dropped | O | Tested: transcripts carry them; hooks do not |
 | C9 | (none) | `harness doctor` pre-start validation; `doctor` event; triage gated on it | A | R3 |
 | C10 | (none) | Task and parent markers (`HARNESS_TASK_ID`, `HARNESS_PARENT_SESSION`, `HARNESS_SESSION_ID`) and delegate detection | A | R4 |
 | C11 | `worktree.baseRef` set to `head` settings-wide | Not set | O | It also changes the user's normal app sessions; harness never asks for worktree isolation |
@@ -155,7 +155,7 @@ one spool and different projects never mix.
 
 | Command | Writes | Notes |
 |---|---|---|
-| `harness install --user` | Everything under "user scope" in §4.1 | Idempotent; adds only its own entries (hook entries that call `harness hook`, the allow rule, the writable root, a delimited bootstrap block) and prints each change it made. Prints the one manual step: open Codex once and approve the harness hooks (Codex skips unapproved non-managed hooks and stores approvals in `~/.codex/config.toml` under `hooks.state`; the harness never writes approvals itself). Fails loudly if `$CODEX_HOME/AGENTS.override.md` exists |
+| `harness install --user` | Everything under "user scope" in §4.1 | Idempotent; adds only its own entries (hook entries that call `harness hook`, the allow rule, the writable root, a delimited bootstrap block) and prints each change it made. It appends hook entries after existing ones and never reorders them: Codex keys approvals by file and position (`hooks.json:stop:0:0`), so a reorder would silently un-approve your existing hooks. Prints the one manual step: open Codex once and approve the harness hooks (Codex skips unapproved non-managed hooks and stores approvals in `~/.codex/config.toml` under `hooks.state`; the harness never writes approvals itself). Fails loudly if `$CODEX_HOME/AGENTS.override.md` exists |
 | `harness install` (in a project) | `.harness/project.json` (resolved integration remote and default branch, defaults from §6.2) and the `.gitattributes` line, on a branch | You open, review and merge that PR before the first task |
 
 ### 4.4 Start flow
@@ -173,7 +173,7 @@ You, in a terminal:
 Launch an agent IN THAT WORKTREE: claude / codex CLI, or open the folder in either app.
 Codex must be launched with full access (`-s danger-full-access`, or the app's full-access setting).
   3. Bootstrap: the agent runs `harness start`
-       → resolves the task by branch, runs doctor check E, appends `resume`, prints the checkout
+       → resolves the task by branch, runs doctor (E plus a fast subset of A–C), appends `resume`, prints the checkout
   4. The agent reads AGENTS.md from that checkout → `harness phase triage enter` → … → `harness pr`
 ```
 
@@ -348,7 +348,7 @@ with a Decision naming it (`Check: C3`, or `Check: goal`).
 | `expiry_days` | 21 | Not-done when no terminal disposition by then |
 | `defect_window_days` | 14 | Escaped-defect window after merge |
 | `target_benchmark_tier`, `n`, `alpha`, `min_gain` | `"M"`, 10, 0.05, 0.20 | Reserved for v1; recorded now |
-| `baseline_commit` | harness repo HEAD at install | Recorded in every `start` |
+| `baseline_commit` | harness repo HEAD at install | Reserved for v1 (each `start` records the commit that actually ran as `assigned_commit`) |
 | `challenger_commit`, `shared_commit`, `memory_snapshot_commit` | `null` | Reserved for v1 |
 
 ### 6.3 `config.json`
@@ -373,7 +373,7 @@ checks and implementation notes) · Decisions · Unknowns · Friction. S plans h
 |---|---|
 | `spool.jsonl` (+ `spool.lock`) | Every hook and CLI event of every task, merged or not |
 | `tasks/<task-id>/request.md`, `config.json` | Copies at triage exit, each `harness tier`, and `close --abandon`, so analysis never sees survivors only |
-| `cache/sessions/<session-id>.json` | Token and cost totals read from a transcript, refreshed on every read (§10) |
+| `cache/sessions/<session-id>.json` | Per-session model(s), effort, token and cost totals read from a transcript, refreshed on every read (§10) |
 | `scorecards/<task-id>.json`, `scorecards/summary.md` | Derived; regenerated by `harness score` |
 
 The spool and caches are regenerable only from each other; back up the state directory with the
@@ -430,16 +430,21 @@ branch resolution unambiguous. Hooks never resolve at write time, so they stay f
 
 - **Markers.** The Claude adapter's SessionStart handler (every trigger), in a worktree whose branch
   has a task, writes to `CLAUDE_ENV_FILE`: `HARNESS_SESSION_ID` = the payload's `session_id`, always;
-  `HARNESS_TASK_ID` and `HARNESS_PARENT_SESSION` (= the payload's `session_id`) only when they are not
-  already in its process environment. Tested: these reach Bash commands, child processes and subagents,
+  `HARNESS_TASK_ID` only when it is not already in its process environment; and, only when
+  `HARNESS_PARENT_SESSION` is not already there, `HARNESS_PARENT_SESSION` = an inherited foreign identity
+  variable (`CODEX_THREAD_ID`) if one is present, else the payload's `session_id`. The Claude hook
+  adapter derives `parent_session` the same way. Tested: these reach Bash commands, child processes and subagents,
   survive `cd`, and a Codex process launched with them passes them to its hooks and commands. Codex has
   no equivalent, so its children link by branch when they run in the task's worktree.
 - **Identity in commands.** Claude: `HARNESS_SESSION_ID` (not `CLAUDE_CODE_SESSION_ID`, which may hold
   the startup id after `claude --continue`). Codex: `CODEX_THREAD_ID` (tested equal to the hook's
   `session_id`). Each future adapter names its own identity variable.
 - **Delegates.** A process is a delegate when `HARNESS_PARENT_SESSION` is set and any identity variable
-  in its environment differs from it. A non-delegate's id is the single value its identity variables
-  agree on; if they disagree and `HARNESS_PARENT_SESSION` is unset, the command refuses as ambiguous.
+  in its environment differs from it. A delegate's session id and agent are those of the identity
+  variable whose value differs from `HARNESS_PARENT_SESSION` (Codex launched by Claude P: id = its
+  `CODEX_THREAD_ID`, agent `codex`, parent P; Claude launched by Codex P: id = its `HARNESS_SESSION_ID`,
+  agent `claude`, parent P). A non-delegate's id is the single value its identity variables agree on;
+  if they disagree and `HARNESS_PARENT_SESSION` is unset, the command refuses as ambiguous.
   A delegate may run `harness check` (including `--observed`); `harness start` in a delegate appends
   nothing and prints "delegate of task <id>: follow your prompt"; `harness phase`, `review` and `pr`
   refuse. This keeps one owner per task record; it does not limit how agents organize work.
@@ -480,7 +485,7 @@ retroactively for every task recorded since its raw data started.
 
 | Metric | Role | Raw data | Recorded from | Computed from |
 |---|---|---|---|---|
-| Wall time | **Score** | `start`, `phase`, `resume`, `review`, `ready`, `close` events | Slice 1 | Slice 1 |
+| Wall time | **Score** | `start`, `phase`, `resume`, `review`, `ready`, `close` events | Slice 1 (`review` from Slice 2) | Slice 1 |
 | Not done | Guardrail | Gate inputs, `close`, deadlines, expiry | Slice 1 | Slice 1 |
 | Tier upgrade | Guardrail | `config.json` `origin_tier`/`tier`; `tier` events | Slice 1 (triage); `tier` from Slice 2 | Slice 3 |
 | Escaped defects | Guardrail | `defect` events | Slice 2 | Slice 3 |
@@ -547,8 +552,9 @@ Environment failures are independent of the arm, so they add noise, not bias.
 1. One task = one branch = one worktree; branch names and task ids are never reused.
 2. Parallel tasks write disjoint task folders; the only shared repo files are `.harness/memory/*.md`
    (union merge plus by-id cleanup) and `project.json` (read-only during tasks).
-3. Every spool append takes an exclusive file lock and writes one complete line; `start --new` holds
-   the lock across uniqueness check, assignment and append. Readers ignore an incomplete last line.
+3. Every spool append, and every task `events.jsonl` append, takes the spool's exclusive file lock and
+   writes one complete line (a controller and a delegate may write at the same moment); `start --new`
+   holds the lock across uniqueness check, assignment and append. Readers ignore an incomplete last line.
 4. `git fetch` retries with backoff on ref-lock errors (tested: concurrent fetches from several
    worktrees fail about half the time without it).
 5. Only the controlling session (or you, for `pr --refresh` and manual `build enter`) issues `phase`,
@@ -576,7 +582,7 @@ writes `scorecards/<task-id>.json` and `scorecards/summary.md`.
   coverage of each field; tasks nearing expiry. The spread is the input for choosing N in v1.
 - **Transcripts:** Claude (`usage` per message and the `cost-state` row: dollars, tokens, durations)
   and Codex (`token_count` totals; helpers' parent and depth from `session_meta`). Every read refreshes
-  that session's totals under `cache/sessions/`, and the last cached values remain if the agent later
+  that session's model(s), effort and totals under `cache/sessions/`, and the last cached values remain if the agent later
   deletes the transcript (Claude's `cleanupPeriodDays`), so run `score` at least weekly. Unreadable or changed
   formats leave fields null and raise the scorecard's coverage warning.
 - No agent sees scorecards; no phase file reads the state directory.
@@ -630,7 +636,9 @@ already trusted at session start, and full access at launch works; a user-level 
 sandboxed Codex write the state dir; Claude ignores project allow rules in untrusted worktree paths;
 `Bash(x:*)` respects word boundaries; both agents follow a "run this first" instruction; transcripts
 carry tokens (both) and dollars (Claude); union merge works under `rebase --merge`; concurrent fetches
-collide; the account is ADMIN on both pilots.
+collide; the account is ADMIN on both pilots. Also resolved after review: in mvp, Codex loads the global
+`~/.codex/AGENTS.md` alongside mvp's project `AGENTS.override.md`; a sandboxed Codex can lock and append
+to a file in a writable root; after `claude --resume`, SessionStart fires again and the marker is current.
 
 **Remaining, each with its safety net:**
 
@@ -652,7 +660,7 @@ collide; the account is ADMIN on both pilots.
 | Children launched by a Codex session outside the task's worktree are unlinked | Listed as orphans; transcripts hold the link |
 | Concurrent tasks share machine, test slots and provider quotas | Disclosed, as in the parent |
 | Operator knows the arm (v1) | Disclosed, as in the parent |
-| You forget `pr --refresh` before a merge | The gate marks the task not-done (the merged tree differs from the `ready` tree); the scorecard says why |
+| You forget `pr --refresh`, merge after `main` moved, or use GitHub's "Update branch" | The gate marks the task not-done (the merged tree differs from the `ready` tree); the scorecard says why. mvp's branch protection (strict status checks) blocks such merges; echo-wiki has none, so follow §17 there |
 | The per-machine state directory is lost | Back it up with the machine |
 
 ---
@@ -697,8 +705,10 @@ inherit the launcher's environment but do not see `CODEX_THREAD_ID`; shell comma
 writes to `~/.local/state`; a user-level `sandbox_workspace_write.writable_roots` entry makes a
 directory writable while the sandbox stays on. Full access works at launch (`-s danger-full-access`),
 or from a project's `.codex/config.toml` only when that path was already trusted at session start.
-Passing a trust override with `-c projects."<path>".trust_level` persisted a trust entry into the user's
-config. Rollouts hold cumulative `token_count` totals (no dollars) and, for helpers, `session_meta`
+Every `codex exec` run persists a `trust_level = "trusted"` entry for its working directory into the
+user's `~/.codex/config.toml`, so Codex delegates launched with `codex exec` in task worktrees leave one
+entry per worktree (harmless; Codex's own behavior). In mvp, the global `~/.codex/AGENTS.md` loads together
+with the project's `AGENTS.override.md`. A sandboxed process can `flock` and append inside a writable root. Rollouts hold cumulative `token_count` totals (no dollars) and, for helpers, `session_meta`
 with `parent_thread_id` and depth.
 
 **git 2.54 and GitHub.** `rebase --merge` honors `merge=union`; concurrent fetches across worktrees of
@@ -710,10 +720,13 @@ one repo fail on ref locks about half the time; the account is ADMIN on `echothe
 ## 17. Daily use
 
 1. Write the task in a file outside the worktree. Create a worktree from fresh `origin/main`.
-2. In the worktree: `harness start --new <slug> --benchmark-tier S|M|L --request <file>`.
+2. In the worktree, right before launching the agent (the clock starts here):
+   `harness start --new <slug> --benchmark-tier S|M|L --request <file>`.
 3. Open Claude or Codex (Codex with full access) in that worktree; it bootstraps itself.
 4. Answer questions when asked; stops and resumes are fine (any number of sessions).
-5. When the PR is ready: review it; run `harness pr --refresh <task-id>`; merge.
+5. When the PR is ready: review it; run `harness pr --refresh <task-id>`; merge as soon as its checks
+   pass. If `main` moves first, refresh again. Never use GitHub's "Update branch" button: it changes the
+   branch without a `ready`, so the merged code no longer matches and the task fails the gate.
 6. Afterwards: `harness close <task-id> --done` if the PR flagged a scope reduction;
    `harness defect <task-id> "<line>"` if a bug surfaces; `harness close <task-id> --abandon` for a
    task that will not merge.
