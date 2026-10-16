@@ -21,7 +21,7 @@ regenerated in Task 3 with `tests/smoke/codex_facts.py`.
 **Execution:** one implementer in one session (tasks share `adapters/`, `doctor.py`, `start.py`), then the
 user's review protocol on the PR: an independent adversarial review (Fable, max effort) until APPROVE.
 
-**Revision:** r1 (2026-10-16), aligned with spec r5.
+**Revision:** r2 (2026-10-16), aligned with the approved spec (r7).
 
 ## Global constraints
 
@@ -260,8 +260,8 @@ inside the array, verified the same way (`want` = before minus the root).
 lines were printed, Task 2).
 
 **Uninstall:** backup `hooks.json`; drop each harness handler (and a group it leaves empty); list, per
-event, the user's groups that sat after a removed harness group: "`<event>` group <i> moved: trust it again
-in Codex `/hooks`"; remove the marked block (and `AGENTS.md` if the block was all it held); `remove_root`.
+event, the user's groups that sat after a removed harness group: "`<event>` group <i> moved: Codex skips it
+until you trust it again in `/hooks`"; remove the marked block (and `AGENTS.md` if the block was all it held); `remove_root`.
 
 **Tests first (temp HOME with `.codex`, `CODEX_HOME` set explicitly):**
 - [ ] Fresh install writes six groups, the block and the root; second install: no change lines.
@@ -441,9 +441,9 @@ start --new` in the main checkout".
 
 **Bootstrap** (`hooks/bootstrap.md`): the first sentence's "ignore this file" becomes "ignore these
 instructions"; appended sentence: "To start a new harness task for the user, run
-`harness start --new` in the project's main checkout with the user's tier and the user's request text
-verbatim, saved outside any checkout; it creates the task's worktree and says where to open the next
-session."
+`harness start --new` in the project's main checkout with the user's tier (ask if they gave none) and the
+user's request text verbatim, saved outside any checkout; it creates the task's worktree and says where to
+open the next session."
 
 **Tests first (`tests/test_worktrees.py`, Sandbox):**
 - [ ] Main checkout on `main`: creates `<tmp>/worktrees/main/claude/<task-id>` (Sandbox's main checkout
@@ -469,10 +469,11 @@ session."
 
 **Files:** `logbook/build.py`, `logbook/viewer.html`, `logbook/README.md` (if it documents cost fields),
 `tests/test_logbook.py` (new tests, plus the declared edit: `test_readers_are_chosen_by_the_recorded_agent`
-uses `gemini` as the agent with no reader), a recorded Codex log fixture `tests/fixtures/codex/rollout.jsonl`
-captured on the Mac by `codex_facts.py --log-fixture` (Task 10): a scripted session whose shell runs a
-`harness check C1` line and a `gh pr merge 1 --squash` line, spawns a subagent, with `effort` set and
-`token_count` events; plus the subagent's own log for the helper-tokens test. `apply_patch` parsing is
+uses `gemini` as the agent with no reader), recorded Codex log fixtures `tests/fixtures/codex/logs/{e-0,c-0,c-1}.jsonl`
+captured on the Mac by `codex_facts.py` (Task 10): run E's log (`logs/e-0.jsonl`: a `harness check C1`
+line, a `gh pr merge 1 --squash` line, an `apply_patch` through `exec_command`, `effort` set,
+`token_count` events) and run C's parent and subagent logs (`logs/c-0.jsonl`, `logs/c-1.jsonl`) for the
+helper-tokens test. `apply_patch` parsing is
 tested with lines in the format a Codex `apply_patch` call records (`*** Update File: <path>`), checked
 against a real capture if the Mac's Codex offers the tool to the mock model, else marked as format-assumed
 in the test.
@@ -481,7 +482,8 @@ in the test.
 `read_claude_log` plus `"token_only": True`:
 - `session_meta` → known; `origin = {"entrypoint": originator, **first_prompt}` (first `event_msg`
   `user_message` text when `with_prompts`).
-- `turn_context` → remember `model`, `effort`; `models[last model] = 1` at the end.
+- `turn_context` → remember `model`, `effort`; at the end `models[last model] = 1` and `effort` = the last
+  effort (a key Claude's reader lacks; `session_out` uses it when the records carry no effort).
 - `response_item` `function_call` `exec_command` (`arguments.cmd`) or `shell` (`arguments.command`, a list
   → `shlex.join`) → the same `inspect()` path as Claude's `_SHELL_TOOLS` branch (harness commands,
   uninspected, GitHub writes, harness-file writes, rebases); its `function_call_output` → outcome from
@@ -503,15 +505,18 @@ in the test.
 
 **Cost:** `cost_summary(pairs)` takes `(agent, log)` pairs per §9 (the call site passes main, side and
 delegate sessions as today, plus Codex helper logs read from `agent_transcript_path`); a log with
-`token_only` is token-only; `sessions`/`logs_total` count Claude entries (missing logs by their session's
-agent). Record when any Claude log has a cost record or any token-only log was read; Claude-only results
+`token_only` is token-only; `sessions`/`logs_total` count sessions whose agent has no token-only reader
+(Claude's; never helpers), missing logs by their session's agent. Record when any Claude log has a cost record or any token-only log was read; Claude-only results
 are unchanged plus `tokens_only: 0`; `usd`/`usd_exact` null when no cost record; token-only models listed
 with their output tokens and `usd: null`. `batch_summary`: `exact` skips null; `usd_runs` counts non-null.
 
-**Viewer:** the dollar tile shows "tokens only" when `usd` is null and "excludes N token-only sessions"
-when `usd` is set and `tokens_only > 0`; "Cost by model" also lists token-only models (output tokens,
-"tokens only" in place of dollars); `partialCost` unchanged (it reads `sessions`/`logs_total`, now
-Claude-only). The page names no agent (`test_no_adapter_names_or_prefixes`).
+**Viewer:** every print of a null `usd` on a task with `tokens_only > 0` says "tokens only" (the task's
+dollar tile, the project table's cost cell; the sort puts such tasks with the unpriced ones); the tile says
+"excludes N token-only sessions" when `usd` is set and `tokens_only > 0`, and the partial caption wins when
+both apply; the tokens caption ("N output · tokens only" for token-only tasks) prints whenever `cost` is
+present, outside the `if (md.length)` model-bar block; no bar for token-only models; the project tile says
+"N tasks with dollar totals"; `partialCost` unchanged (it reads `sessions`/`logs_total`). The page names no
+agent (`test_no_adapter_names_or_prefixes`).
 
 **Tests first:**
 - [ ] `read_codex_log` on the fixture: counts for harness commands, a `gh pr merge` write, a harness-file
@@ -536,13 +541,13 @@ Claude-only). The page names no agent (`test_no_adapter_names_or_prefixes`).
 **Files:** `tests/smoke/codex_facts.py` (the Phase 0b script, unchanged), `tests/smoke/run_smoke.py`
 (an opt-in `--agent codex` run), `tests/smoke/README` lines in `README.md`.
 
-- [ ] Add the script with one more option, `--log-fixture`: an extra run whose mock model has the shell
-  run `harness check C1 || true` and `gh pr merge 1 --squash || true`, spawns a subagent, with
-  `-c model_reasoning_effort="high"`; it copies the parent's and the subagent's session logs (paths
-  scrubbed) to `<out>/fixtures/rollout*.jsonl`.
+- [ ] Add the script as run on the Mac (sha256 `d1d5a7fb…`): run E has the shell run
+  `harness check C1 || true`, `gh pr merge 1 --squash || true` and an `apply_patch` adding
+  `.harness/runs/x/note.md`, with `model_reasoning_effort="high"`; every run's session logs are copied,
+  scrubbed (paths; `session_meta.base_instructions` dropped), to `<out>/logs/`.
 - [ ] A unit test runs its mock server class standalone (no Codex needed) to keep it importable.
 - [ ] `run_smoke.py --agent codex`: throwaway `CODEX_HOME` (with the user's `auth.json` copied in when
-  present, else skip with a message), `install --user` into the temp home, a scripted task driven by
+  present, deleted in a `finally`; else skip with a message), `install --user` into the temp home, a scripted task driven by
   `codex exec -s danger-full-access --dangerously-bypass-hook-trust "<prompt>" < /dev/null`, then
   `harness score` and the expected card fields; never touches the real `~/.codex`.
 
@@ -564,7 +569,8 @@ and their fact tests.
   session does not work on the task" rule; time from registration is charged.
 - [ ] project-setup: `AGENTS.override.md` in `$CODEX_HOME` blocks install; Codex projects trusting; the
   layout's `worktrees/` folder sits outside every repository.
-- [ ] Guide: Codex tokens, "tokens only" / "Claude sessions only".
+- [ ] Guide: Codex tokens ("tokens only", "excludes N token-only sessions"); path examples keep `<agent>`
+  as a placeholder (the Guide and page name no agent: `test_logbook.py` lines 214 and 239).
 - [ ] `test_instructions` and the Guide tests pass (every named command exists; facts match the code).
 
 ---
