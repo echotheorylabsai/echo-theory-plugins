@@ -1,6 +1,6 @@
 # Lean Harness Slice 2a — Codex Agents — Product Spec
 
-Status: draft for review 2026-10-16 · owner: the user (sole developer).
+Status: draft r2 for review 2026-10-16 (r2 folds in the Phase 0b container results, §10.1) · owner: the user (sole developer).
 Parent: [Lean Harness v0 product spec](./2026-10-08-lean-harness-v0-product-spec.md) (amended by H1–H12).
 This spec is the build contract for Slice 2a. Where it and the v0 spec differ, this spec wins; §14 lists
 every difference, applied to the v0 spec in the same PR that ships 2a. Anything not mentioned here follows
@@ -47,7 +47,7 @@ and `harness score` over every task recorded before 2a produces scorecards ident
 - Helper detection from the event log for sessions that carry no parent marker (§7).
 - Logbook: a Codex session-log reader at parity with the Claude reader where Codex logs carry the data (§9).
 - Codex hook-payload fixtures and adapter-contract tests; a `codex exec` smoke run.
-- Phase 0b checks on the user's Mac (§10).
+- Phase 0b: Codex facts checked in the cloud container (done, §10.1) and on the user's Mac (§10.2).
 - Docs: harness `README.md`, `docs/project-setup.md`, the Logbook Guide, and the v0 spec deltas (§14).
 
 ### 2.2 Moved to Slice 2b (unchanged in content)
@@ -85,7 +85,7 @@ logbook ──► READERS: claude → read_claude_log, codex → read_codex_log 
 | `install`, `uninstall`, `doctor`, `start` | Loop over found agents; `start` in an agent session probes only its own agent (§8) |
 | `harness/context.py` / `identity.py` | Event-log helper lookup when no parent marker is present (§7) |
 | `logbook/build.py` | `read_codex_log` and its `READERS` entry; cost text for token-only sessions (§9) |
-| `tests/fixtures/codex/` | **New.** Real payloads from Phase 0b |
+| `tests/fixtures/codex/` | **New.** Real payloads captured in Phase 0b (§10.1), checked against the Mac (§10.2) |
 | Unchanged | Phases and phase files, `AGENTS.md` (unless the D5 fallback is needed), done gate, timing rules, event schema v1 (no new kinds, no new fields), every command's flags |
 
 ---
@@ -119,7 +119,7 @@ so `start --new` fails with "run `harness install --user`". That is the intended
 
 | File | Change | Safety rule |
 |---|---|---|
-| `$CODEX_HOME/hooks.json` | Append one matcher group per event (§6), matching every source, whose handler runs `<dispatcher> hook codex <Event>` | Append after existing groups, never reorder: Codex keys hook trust by file and position (`hooks.json:<event>:<i>:<j>`), so a reorder would silently un-trust the user's hooks. Never writes a file it cannot parse |
+| `$CODEX_HOME/hooks.json` | Append one group per event (§6), with no matcher (matches every source), whose one handler is `{"type": "command", "command": "<dispatcher> hook codex <Event>"}`; the `SessionEnd` handler adds `"timeout": 3` (Codex defaults it to 1 s and clamps it to 3 s) | Append after existing groups, never reorder: Codex keys hook trust by position (`<absolute hooks.json path>:<event_snake_case>:<group>:<handler>`), so a reorder would silently un-trust the user's hooks. Never writes a file it cannot parse |
 | `$CODEX_HOME/AGENTS.md` | A marked block holding `hooks/bootstrap.md` verbatim | Markers `<!-- lean-harness bootstrap: begin -->` / `end`; a stale block is replaced in place; text outside the block is never touched |
 | `$CODEX_HOME/config.toml` | The harness state root (`${XDG_STATE_HOME:-~/.local/state}/harness`, absolute) added to `[sandbox_workspace_write].writable_roots` | Back up first (same permission bits, as Claude's settings backup); edit only that key; re-parse with `tomllib` and confirm nothing else changed, else restore the backup and print the one line to add by hand |
 
@@ -137,21 +137,27 @@ so `start --new` fails with "run `harness install --user`". That is the intended
 
 ## 6. Codex events
 
-Same six events and kinds as Claude. Required fields are the v0 §16 facts; Phase 0b fixtures confirm or
-correct them before the adapter is written.
+Same six events and kinds as Claude. Fields are the Codex 0.163.0 hook schemas (Phase 0b, §10). Codex
+declares `transcript_path` and `agent_transcript_path` nullable, so they are recorded when present and never
+reported missing.
 
 | Codex hook | Kind | Required payload fields | Extra fields recorded |
 |---|---|---|---|
-| `SessionStart` | `session_start` | `session_id`, `transcript_path`, `source` | `trigger` = `source` |
-| `UserPromptSubmit` | `prompt` | `session_id`, `transcript_path`, `turn_id` | `turn_id` |
-| `Stop` | `stop` | `session_id`, `transcript_path`, `turn_id` | `turn_id` |
-| `SubagentStart` | `subagent_start` | `session_id`, `transcript_path`, `agent_id`, `agent_type` | `agent_id`, `agent_type` |
-| `SubagentStop` | `subagent_stop` | `session_id`, `transcript_path`, `agent_id`, `agent_type`, `agent_transcript_path` | `agent_id`, `agent_type` |
-| `SessionEnd` | `session_end` | `session_id`, `transcript_path`, `reason` | `reason` |
+| `SessionStart` | `session_start` | `session_id`, `source` | `trigger` = `source` |
+| `UserPromptSubmit` | `prompt` | `session_id`, `turn_id` | `turn_id` |
+| `Stop` | `stop` | `session_id`, `turn_id` | `turn_id` |
+| `SubagentStart` | `subagent_start` | `session_id`, `agent_id`, `agent_type` | `agent_id`, `agent_type` |
+| `SubagentStop` | `subagent_stop` | `session_id`, `agent_id`, `agent_type` | `agent_id`, `agent_type`, `agent_transcript_path` |
+| `SessionEnd` | `session_end` | `session_id`, `reason` | `reason` |
 
+- **A built-in subagent's own prompts are dropped.** Codex fires `UserPromptSubmit` inside a built-in
+  subagent with the parent's `session_id` and the subagent's `agent_id`. Recorded as a `prompt`, it would
+  split or reopen the main session's agent-time span (H9); the helper's time is already its
+  `subagent_start` → `subagent_stop` span. So a `UserPromptSubmit` with a non-empty `agent_id` records
+  nothing (as the Claude adapter drops a `SubagentStop` with an empty `agent_type`).
 - **Common fields:** `agent` = `codex`; `model` from the payload (all events but `SessionEnd`); `effort`
-  from the payload if Phase 0b finds it there, else null in the event (the Logbook may still read it from
-  the session log, §9); `parent_session` per §7; `task_id` from `HARNESS_TASK_ID` when inherited, else null.
+  null (no Codex hook carries it; the Logbook reads it from the session log, §9); `parent_session` per §7;
+  `task_id` from `HARNESS_TASK_ID` when inherited, else null.
 - **Task link:** Codex cannot export markers to its session, so Codex events link to the task by branch
   (v0 §6.8, unchanged).
 - **Unexpected payloads** produce a `format_warning`, never a crash (v0 §4.4).
@@ -183,11 +189,13 @@ prints "delegate of task <id>: follow your prompt"; `phase`, `rebase`, `pr` and 
 |---|---|
 | Claude → Claude or Codex | Env markers (unchanged) |
 | Codex → Claude | Claude adapter reads the inherited `CODEX_THREAD_ID` (unchanged) |
-| Codex → its built-in subagents | Hook events under the parent `session_id`; rule 2 for their commands |
-| Codex → `codex exec` | Rule 1, if Phase 0b shows the child's hooks inherit the parent's `CODEX_THREAD_ID` |
+| Codex → its built-in subagents | Hook events under the parent `session_id`; rule 2 for their commands (their shell's `CODEX_THREAD_ID` is the subagent's own id, the `agent_id`) |
+| Codex → `codex exec` | Rule 1 (the child's hook processes inherit the parent's `CODEX_THREAD_ID`; its payload and shell carry its own id) |
 
-**Fallback** (only if Phase 0b shows rule 1 cannot see the parent): the Codex bootstrap block gains one line
-— "To launch another agent process for part of a harness task, prefix it with
+Both rules were confirmed on Codex CLI 0.163.0 (Phase 0b, §10).
+
+**Fallback** (only if the Mac check shows rule 1 cannot see the parent there): the Codex bootstrap block
+gains one line — "To launch another agent process for part of a harness task, prefix it with
 `HARNESS_PARENT_SESSION=$CODEX_THREAD_ID`" — and the risk in §13 stays open. `AGENTS.md` stays
 agent-neutral either way.
 
@@ -198,7 +206,7 @@ agent-neutral either way.
 | Probe | Codex check | Fix printed |
 |---|---|---|
 | `codex_hooks` | A harness group for each of the six events in `$CODEX_HOME/hooks.json`; `[features].hooks` not `false` | `harness install --user` |
-| `codex_hooks_trusted` | A trust entry in `config.toml` for the position of each harness hook | Open Codex, `/hooks`, trust the harness hooks |
+| `codex_hooks_trusted` | For each harness hook's key, `[hooks.state."<key>"]` in `config.toml` has a `trusted_hash` and `enabled` is not `false`. The hash itself is not recomputed (its format is Codex's own); a hook changed after trust is caught by the session probe | Open Codex, `/hooks`, trust the harness hooks |
 | `codex_writable_root` | The state root is in `[sandbox_workspace_write].writable_roots` | `harness install --user` |
 | `codex_bootstrap` | The marked block is present and equals `hooks/bootstrap.md` | `harness install --user` |
 | `codex_no_override` | No `$CODEX_HOME/AGENTS.override.md` | Remove or rename it |
@@ -214,8 +222,8 @@ writable root.
 | Field | Codex source |
 |---|---|
 | Model | Hook payload |
-| Effort | Payload or session log, whichever Phase 0b finds; else null |
-| Tokens | Session log cumulative `token_count` totals, complete per session |
+| Effort | Session log `turn_context.effort` (Logbook only; events carry null) |
+| Tokens | Session log: the last `token_count` event's `info.total_token_usage` (cumulative: input, cached input, output, reasoning output, total) |
 | Dollars | Null. Never estimated |
 | Helper links | Hook events; `session_meta.parent_thread_id` in the helper's log as a cross-check |
 
@@ -230,18 +238,34 @@ missing one. A missing Claude cost record still marks the total partial.
 
 ---
 
-## 10. Phase 0b: checks on the user's Mac (before code)
+## 10. Phase 0b: Codex facts
 
-Run by the user in their own terminal from a script in the plan (an agent's safety check refused the
-full-access `codex exec` in Phase 0). Results go into v0 §16 and the fixtures.
+### 10.1 Done in the cloud container (2026-10-16, Codex CLI 0.163.0, Linux)
 
-| # | Check | Feeds | If it fails |
-|---|---|---|---|
-| 0b.1 | Capture all six Codex CLI hook payloads (a throwaway repo; a session that runs a built-in subagent) | §6 required fields, fixtures | Adjust §6 to what Codex sends |
-| 0b.2 | The Codex desktop app runs user-level hooks from `$CODEX_HOME/hooks.json` | D2 | Desktop app listed as unsupported; the session probe already stops it before triage |
-| 0b.3 | A `codex exec` launched from a Codex session: do its hooks see the parent's `CODEX_THREAD_ID`? What do its shell commands see? | §7 rule 1 | §7 fallback |
-| 0b.4 | A Codex built-in subagent's shell commands: which `CODEX_THREAD_ID` do they see? | §7 rule 2 | Same as parent: nothing to do; otherwise rule 2 as written |
-| 0b.5 | Re-check v0 §16 Codex facts on the installed version: `hooks.json` shape, trust storage key format, `[features].hooks`, `SessionEnd` in the desktop app, where effort is recorded | §5, §6, §8, §9 | Update the affected section before the plan |
+Method: a throwaway `$CODEX_HOME` per run; a local mock model provider (`wire_api = "responses"`, no
+OpenAI account); `codex exec --dangerously-bypass-hook-trust` (throwaway home only); a hook logger recording
+each payload and the `CODEX_*` / `HARNESS_*` environment; the hook input JSON schemas embedded in the binary;
+the app-server's `hooks/list`. The captured payloads become the adapter fixtures (paths scrubbed).
+
+| # | Fact | Used in |
+|---|---|---|
+| 0b.1 | `hooks.json` is `{"hooks": {"<Event>": [{"matcher"?, "hooks": [{"type": "command", "command", "timeout"?}]}]}}`; all six events fire; payload fields as in §6 (no `effort` in any hook) | §5, §6 |
+| 0b.3 | A `codex exec` launched from a Codex shell: its hook processes inherit the parent's `CODEX_THREAD_ID`; its payload `session_id` and its shell's `CODEX_THREAD_ID` are its own | §7 rule 1 |
+| 0b.4 | A built-in subagent: `SubagentStart`/`SubagentStop` carry the parent `session_id` and `agent_id` = the subagent's thread id; its shell's `CODEX_THREAD_ID` = that `agent_id`; it fires `UserPromptSubmit` with the parent `session_id` and its `agent_id` | §6, §7 rule 2 |
+| 0b.5 | Hook processes never see their own session's `CODEX_THREAD_ID` (v0 §16 holds); shells also see `CODEX_SESSION_ID` and `CODEX_VERSION` | §7 |
+| 0b.6 | Trust key `<absolute hooks.json path>:<event_snake_case>:<group>:<handler>`; state `[hooks.state."<key>"]` with `trusted_hash`, `enabled`; `[features].hooks` is stable and on by default | §5, §8 |
+| 0b.7 | `SessionEnd` hook timeout: default 1 s, clamped to at most 3 s; other events 600 s | §5, §13 |
+| 0b.8 | Session log: `session_meta` (subagents add `parent_thread_id`, depth), `turn_context.effort`, `function_call` items (`exec_command` with `cmd`), cumulative `token_count`; no dollars | §9 |
+| 0b.9 | Hook `permission_mode` reads `bypassPermissions` under both full access and `workspace-write` in `exec`, so it is not a sandbox signal; on Linux the sandboxed shell has no `CODEX_SANDBOX` (macOS sets `seatbelt`, v0 §16) | §8 |
+
+### 10.2 Still on the user's Mac (before the PR merges)
+
+Run through a Claude session on the Mac (Remote Control) or by the user from a script in the plan.
+
+| # | Check | If it fails |
+|---|---|---|
+| 0b.2 | The Codex desktop app runs user-level hooks from `$CODEX_HOME/hooks.json`, and sends `SessionEnd` | Desktop app listed as unsupported (D2); the session probe already stops it before triage. No `SessionEnd`: the §13 row applies |
+| 0b.10 | The Mac's Codex version: the six payloads match the container fixtures; a sandboxed shell has `CODEX_SANDBOX=seatbelt`; rule 1 holds | Adjust §6/§8 to the Mac's facts; rule 1 failing → §7 fallback |
 
 ---
 
@@ -280,7 +304,7 @@ full-access `codex exec` in Phase 0). Results go into v0 §16 and the fixtures.
 | Risk or limit | Handling |
 |---|---|
 | Codex changes fast (inline `[hooks]` in `config.toml` and async hooks are recent) | Phase 0b re-checks; unknown payloads warn, never crash; doctor reports drift |
-| The desktop app may not send `SessionEnd` | The controller-end pause (H3) does not apply to that session; the clock keeps running until the next `harness` command, as before H3. Disclosed on the scorecard by the missing `session_end` |
+| The desktop app may not send `SessionEnd`, or the `SessionEnd` hook outlives Codex's 3 s cap | The controller-end pause (H3) does not apply to that session; the clock keeps running until the next `harness` command, as before H3. Disclosed on the scorecard by the missing `session_end`. The hook normally finishes well inside 3 s |
 | Uninstall can move the user's own hooks | It lists them so the user re-trusts them |
 | A `codex exec` helper not recognized (if 0b.3 fails and the agent skips the fallback line) | It looks like a main session. Sandboxed, it fails the session probe (`CODEX_SANDBOX` set) and cannot take control; with full access it can pass `harness start` and become controller. The Logbook shows the controller change; the scorecard's timing follows the recorded controller |
 | Codex dollars unknown | Tokens recorded; dollar totals labeled Claude-only (D4) |
@@ -300,7 +324,7 @@ full-access `codex exec` in Phase 0). Results go into v0 §16 and the fixtures.
 | 11 | Slice 2 row split into 2a (this spec) and 2b (§2.2 here) with their exit criteria |
 | 13 | Close the Codex rows with Phase 0b results |
 | 14 | Add the §13 rows here |
-| 16 | Add a "Phase 0b" paragraph with the installed Codex version and findings |
+| 16 | Add a "Phase 0b" paragraph: §10.1 here, plus the Mac's version and the 0b.2/0b.10 results |
 
 ---
 
