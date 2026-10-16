@@ -1,8 +1,8 @@
 # Lean Harness Slice 2a — Codex Agents — Product Spec
 
-Status: draft r5 for review 2026-10-16 (r2: Phase 0b container results; r3: review round 1 findings,
-the Mac results and task worktrees, D8; r4: review round 2; r5: review round 3; review log at the end) ·
-owner: the user (sole developer).
+Status: draft r6 for review 2026-10-16 (r2: Phase 0b container results; r3: review round 1 findings,
+the Mac results and task worktrees, D8; r4–r6: review rounds 2–4; review log at the end) · owner: the
+user (sole developer).
 Parent: [Lean Harness v0 product spec](./2026-10-08-lean-harness-v0-product-spec.md) (amended by H1–H12).
 This spec is the build contract for Slice 2a. Where it and the v0 spec differ, this spec wins; §14 lists
 every difference, applied to the v0 spec in the same PR that ships 2a. Anything not mentioned here follows
@@ -78,7 +78,7 @@ task worktrees (§15).
             ┌──────────────── adapters (REGISTRY) ────────────────┐
 hook ──────►│ claude.py                 codex.py (new)            │──► spool (state dir)
             └───────┬──────────────────────────┬──────────────────┘
-                    │ found(home)?             │ found(home)?
+                    │ found(home, env)?        │ found(home, env)?
           install / uninstall / doctor act only on found agents
                     │
 harness <cmd> ──► identity: env markers, else the event log (§7) ──► task folder + spool
@@ -90,8 +90,8 @@ logbook ──► READERS: claude → read_claude_log, codex → read_codex_log 
 | Part | Change |
 |---|---|
 | `harness/adapters/codex.py` | **New.** `NAME = "codex"`, `IDENTITY_VAR = "CODEX_THREAD_ID"`, `RUNNING_VAR = "CODEX_THREAD_ID"`, `to_event`, `on_event` (no-op: Codex has no env file), `found`, `install_user`, `uninstall_user`, `doctor_probes` |
-| `harness/adapters/__init__.py` | Register `codex`; add `found(home)` per adapter. `identity_vars` and `foreign_vars` are unchanged in code, but their results now include `codex`, which activates v0 §6.9's cross-agent rows for the first time (§7) |
-| `harness/adapters/claude.py` | Add `found(home)` (§4) and `RUNNING_VAR = "CLAUDECODE"` (§15) only |
+| `harness/adapters/__init__.py` | Register `codex`; add `found(home, env)` per adapter (Codex's home can come from `$CODEX_HOME`). `identity_vars` and `foreign_vars` are unchanged in code, but their results now include `codex`, which activates v0 §6.9's cross-agent rows for the first time (§7) |
+| `harness/adapters/claude.py` | Add `found(home, env)` (§4) and `RUNNING_VAR = "CLAUDECODE"` (§15) only |
 | `install`, `uninstall`, `doctor`, `start` | Loop over found agents; an agent session's `harness start` probes only its own agent (§4) |
 | `harness/commands/start.py`, `harness/commands/doctor.py` | `start --new` in the main checkout creates the task worktree; new optional `--agent`; doctor's main-checkout hint names it (§15) |
 | `harness/context.py` | Event-log helper lookup when no parent marker is present (§7) |
@@ -246,32 +246,41 @@ record through the writable root.
 |---|---|
 | Model | Hook payload; session log `turn_context.model` |
 | Effort | Session log `turn_context.effort` (Logbook only; events carry null) |
-| Tokens | Session log: the last `token_count` event's `info.total_token_usage` (cumulative: input, cached input, output, reasoning output, total) |
+| Tokens | Session log: the last `token_count` event whose `info` is present, its `info.total_token_usage` (cumulative: input, cached input, output, reasoning output, total) |
 | Dollars | Null. Never estimated |
 | Helper links | Hook events |
 
-**`read_codex_log`** returns the same keys as `read_claude_log` and parses only: `exec_command`/`shell`
-calls (through the existing command inspector, so `harness` commands, their outcomes and GitHub writes are
-counted as for Claude), `apply_patch` (writes to harness-owned paths), `spawn_agent` (helper launches),
-`turn_context`, `token_count` and `session_meta`. Every other tool call counts as not inspected (the
-Claude reader's existing rule). A command's outcome comes from its `function_call_output` text ("Process
-exited with code N": 0 done, else failed); a call without one is `no_result`. `cost` is null. The fixture
-for it is a log captured by `codex_facts.py` on the Mac (0.160), the platform that matters.
+**`read_codex_log`** returns the same keys as `read_claude_log` and parses only: shell calls (through the
+existing command inspector, so `harness` commands, their outcomes and GitHub writes are counted as for
+Claude) in both recorded shapes — `exec_command` with a `cmd` string, and `shell` with a `command` argv
+list (joined); `apply_patch` (writes to harness-owned paths), as a custom tool call or as a shell argv whose
+first word is `apply_patch`; `spawn_agent` (helper launches); `turn_context`, `token_count` and
+`session_meta`. Every other tool call counts as not inspected (the Claude reader's existing rule). A
+command's outcome comes from its `function_call_output` text ("Process exited with code N": 0 done, else
+failed); a call without one is `no_result`. `cost` is null. Its fixtures are session logs captured by
+`codex_facts.py` on the Mac (0.160), the platform that matters: the script copies every log it produced
+(main, nested child, subagent) into `<out>/logs/`, scrubbed like the payloads (paths;
+`session_meta.base_instructions` dropped), and the Mac run is repeated once for them. A shape the Mac logs
+do not show (say `shell`) is tested from its recorded form and marked so in the test.
 
 **Cost and tokens.** `read_codex_log` fills `usage` (the log's cumulative tokens, keys mapped to the
 summary's: `input_tokens`→`input`, `output_tokens`→`output`, `reasoning_output_tokens`→`thinking`,
 `cached_input_tokens`→`cache_read`, `cache_write_input_tokens`→`cache_write`) and `models` (the log's
 last `turn_context.model`; a log's tokens are attributed to that model), and sets `token_only: true`.
-`cost_summary` takes `(agent, log)` pairs, so a missing log is counted by its session's agent. It returns
-a record when any log has a cost record or any token-only log was read; a Claude log without a cost record
-changes nothing, as today. `sessions` and `logs_total` count Claude logs only, so Codex sessions never
-make the total partial; `tokens_only` = the number of token-only logs read, helper logs included (a Codex
-helper's own log, from `agent_transcript_path`, adds its tokens; Claude helpers stay inside their
-session's cost record as today); `usd` and `usd_exact` are null when no log has a cost record.
+`cost_summary` takes `(agent, log)` pairs, so a missing log is counted by its session's agent. Its inputs
+are every session, as today, plus the helper logs of non-Claude sessions only (Claude helpers stay inside
+their session's cost record, as today). It returns a record when any log has a cost record or any
+token-only log was read; a Claude log without a cost record changes nothing, as today. `sessions` and
+`logs_total` count Claude sessions (never helpers), a missing Claude log still counting in `logs_total` as
+today, so Codex sessions never make the total partial; `tokens_only` = the number of token-only logs read,
+Codex helper logs included (a Codex helper's own log, from `agent_transcript_path`, adds its tokens); `usd`
+and `usd_exact` are null when no log has a cost record.
 `batch_summary` sums `usd_exact` over the tasks where it is not null, and `usd_runs` counts those tasks.
-The viewer lists token-only models with their output tokens and "tokens only" in place of dollars; the
-dollar tile prints "tokens only" when `usd` is null and "excludes N token-only sessions" (N =
-`tokens_only`) when `usd` is set and `tokens_only` > 0. The page never names an agent (the Logbook's rule,
+The viewer keeps the per-model data and adds no bar for token-only models: the tokens caption reads
+"N output · tokens only". Every print of a null `usd` on a task with `tokens_only` > 0 says "tokens only"
+(the task's dollar tile, the project table's cost cell; its sort puts such tasks with the unpriced ones);
+the dollar tile prints "excludes N token-only sessions" (N = `tokens_only`) when `usd` is set and
+`tokens_only` > 0; the project tile says "N tasks with dollar totals". The page never names an agent (the Logbook's rule,
 pinned by `tests/test_logbook.py` `test_no_adapter_names_or_prefixes`). A missing Claude cost record
 still marks the total partial. Claude-only tasks keep today's fields and values, plus `tokens_only: 0`.
 
@@ -352,9 +361,9 @@ fails, it is listed as unsupported (D2); the session probe already stops it befo
   (`--agent`, one `RUNNING_VAR`, the one found agent, refusal); a used task id refuses before anything is
   created; a failure after the worktree exists removes it (`--force`) and its branch; `start --new` in a
   linked worktree behaves as today; the main-checkout doctor hint.
-- **Logbook:** `read_codex_log` against the Mac-captured Codex log; a Codex-only task shows tokens and
+- **Logbook:** `read_codex_log` against the Mac-captured Codex logs; a Codex-only task shows tokens and
   "tokens only"; a mixed task with every Claude log read is not partial and says "excludes N token-only
-  sessions"; a Codex helper's log adds its tokens; a Claude-only task's cost fields and values are
+  sessions"; a Codex helper's log adds its tokens; a Claude-only task with a helper log keeps its cost fields and values
   unchanged (an open session without a cost record still yields none); a project with one Codex-only task
   builds (`batch_summary`); the page still names no agent.
 - **Regression:** the existing suite; `score.collect` at one fixed `now_ms`, pre-2a vs 2a, over a copy of
@@ -377,6 +386,7 @@ fails, it is listed as unsupported (D2); the session probe already stops it befo
 | Cross-agent chains three deep (Codex → Claude → Codex, Claude → Codex → Claude): the innermost session's commands refuse as ambiguous; its hook events record the top session as parent | Pre-existing v0 limit (identity resolution sees two identities that differ from the parent); unchanged in 2a; transcripts hold the chain |
 | Time from registration to the first `harness start` in the new worktree, and any project setup done there (say mvp's dependency install), is charged | As the pre-push hook is (v0 §4.6): register only when the agent is about to open; `start --new` says so when it prints the path |
 | D3 blocks every `start --new` until a newly found agent is installed and trusted | Loud by design; the fix is printed |
+| A Codex built-in subagent that runs `harness check` appears twice in the Logbook: as a helper span and as a delegate session of the main session | Cosmetic; both are correct records of one helper |
 | A Codex session that registers in the main checkout and then works in the worktree (against §15's rule) is recorded on the default branch | Its hook events are orphans and its end never pauses the clock; the scorecard shows both. Not enforced in 2a (Claude cannot do it: no markers in the main checkout, so `session_live` fails) |
 | Codex dollars unknown | Tokens recorded; dollar totals labeled Claude-only (D4) |
 | Each `codex exec` adds a trust entry per worktree to `config.toml` | Codex's own behavior; harmless (v0 §16) |
@@ -417,8 +427,8 @@ clean up, and the parent folder holds only project checkouts.
          └─ <task-id>/                   <date>-<slug>: oldest first
 ```
 
-- `<parent>` and `<project>` come from the git common dir (the main checkout's parent folder and folder
-  name), so they are the same from any worktree of the project.
+- `<parent>` and `<project>` are the main checkout's parent folder and folder name (its top level: worktrees
+  are only created from the main checkout).
 - `<agent>` is the agent that started the task. A new adapter (say Cursor) gets its own folder with no
   other change.
 - The branch is `<task-id>`, so folder, branch and task id are one name, `git worktree list` describes
@@ -548,3 +558,19 @@ the v0 roadmap. A Codex transcript reader for scoring (2b's cache) reuses `read_
 | M12 "ignore this file" inside the user's `AGENTS.md` | §15: "ignore these instructions" |
 | M13 reader fixture platform | §9: Mac-captured log |
 | Cut: `HARNESS_SESSION_ID` clause in the Codex parent rule | Cut (§7) |
+
+### Round 4 (r5 → r6): Fable (max effort) REVISE (one major)
+
+| Finding | Resolution |
+|---|---|
+| M13 incomplete: the Mac logs were never copied out | §9: the script copies scrubbed logs to `<out>/logs/`; one Mac re-run |
+| P1 Claude helper logs would make Claude tasks partial | §9: helper logs of non-Claude sessions only; `sessions`/`logs_total` count Claude sessions; §12 test with a helper log |
+| P2 `shell` shape unrecorded | §9: both shapes and `apply_patch` through the shell; unseen shapes tested from their recorded form |
+| P3 other prints of a null `usd` | §9: "tokens only" wherever a null `usd` prints; project tile wording |
+| P4 `found(home)` cannot see `$CODEX_HOME` | `found(home, env)` |
+| P5 `token_count.info` may be null | §9 table: the last one with `info` |
+| P6 a subagent listed twice in the Logbook | §13 row |
+| P7 `<parent>`/`<project>` source | §15: the main checkout's top level |
+| Cut: token-only model bars | Cut: caption only |
+| Cut: "Claude is always found" | Not taken: D3 (the user's choice) installs only agents found on the machine; the rule is one line |
+| Decision challenge: drop `<agent>` from the path | Not taken: showing which agent started a task is the user's stated requirement for D8; every session's agent stays in the records |
