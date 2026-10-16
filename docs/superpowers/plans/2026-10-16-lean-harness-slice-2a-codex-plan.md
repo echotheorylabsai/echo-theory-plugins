@@ -21,7 +21,7 @@ regenerated in Task 3 with `tests/smoke/codex_facts.py`.
 **Execution:** one implementer in one session (tasks share `adapters/`, `doctor.py`, `start.py`), then the
 user's review protocol on the PR: an independent adversarial review (Fable, max effort) until APPROVE.
 
-**Revision:** r4 (2026-10-16): plan review rounds 1–2 applied (review log at the end).
+**Revision:** r5 (2026-10-16): plan review rounds 1–3 applied (review log at the end).
 
 ## Global constraints
 
@@ -199,8 +199,9 @@ def to_event(hook_event, payload, env, foreign_vars):
   name reported.
 - [ ] `parent_session`: plain → self; inherited `CODEX_THREAD_ID` = P ≠ S → P; equal to S → S;
   `HARNESS_PARENT_SESSION` wins.
-- [ ] Through `harness hook codex <Event>` (subprocess, Sandbox): a fixture lands in the spool with the
-  common git fields. `hook.py` looks the adapter up in `REGISTRY`, so this test lands in Task 6, after
+- [ ] Through `harness hook codex <Event>` (subprocess, Sandbox): each fixture, with its `cwd` replaced by the
+  Sandbox worktree (as `Sandbox.hook` does; the fixtures' `/tmp/codex-facts/repo` does not exist), lands in
+  the spool with the common git fields. `hook.py` looks the adapter up in `REGISTRY`, so this test lands in Task 6, after
   registering.
 
 ---
@@ -266,7 +267,8 @@ def add_root(path: Path, root: str) -> str | None:
 section → insert `writable_roots = [lit]` right after the header; `writable_roots = [` in that section →
 insert `lit, ` after the `[` (TOML allows a trailing comma). Every other shape fails verification and gets
 the manual line. `remove_root` reverses: removes `BLOCK` verbatim if present and verified, else the
-`lit, `/`lit` text inside the array, verified the same way (`want` = before minus the root); a non-list
+`lit, `/`lit` text inside the array, verified the same way (`want` = before minus the root for element removal; for `BLOCK`
+removal, before without the whole `sandbox_workspace_write` table); a non-list
 `writable_roots` gets the manual line; when the remaining text is empty (install created the file), the
 file is removed. It never raises: a failed verification restores the
 file and returns the line "`config.toml`: remove <lit> from writable_roots by hand", so the uninstall's
@@ -314,7 +316,9 @@ runs `install --user` and `trust_all`). Tasks 5, 6, 7, 9 and 10 use it. Codex ig
 `--dangerously-bypass-hook-trust` (0b.6), so the smoke can use them too.
 
 **Probes** (`doctor_probes()` returns them in this order): `codex_hooks`, `codex_hooks_trusted`,
-`codex_writable_root`, `codex_bootstrap`, `codex_no_override`, `codex_full_access`.
+`codex_writable_root`, `codex_bootstrap`, `codex_no_override`, `codex_full_access`. `codex_hooks`' fix
+text names both causes, as `probe_claude_hooks` does: "missing Codex hooks [...] or `[features] hooks =
+false` in config.toml: run `harness install --user` / remove that line".
 
 Trust match (§8):
 
@@ -363,6 +367,8 @@ module).
 - [ ] CLI (moved from Task 4): with a `.codex` home, `install --user` prints Claude's lines, then raises on
   an `AGENTS.override.md` with Claude's files in place; `uninstall --user` lists a user group that sat after
   a harness group.
+- [ ] A `.codex` home with no harness entries: `start --new` fails `codex_hooks` with "run `harness install
+  --user`" (the intended loud failure, §4).
 - [ ] Both homes: a Claude session's `start` writes a `doctor` event whose `checks` has no `codex_*` key;
   `start` with no identity has both agents' keys.
 - [ ] Codex-only home (`.codex` only): `found_agents` → `["codex"]`; `install --user` writes no `.claude/*`
@@ -405,7 +411,7 @@ start). Notice: `start` prints `delegate of task <id>: follow your prompt (paren
 - [ ] Rule 1: spool has `session_start` S with `parent_session` P (≠ S) → `phase` refuses, `check` records
   `delegate=true`, `parent_session=P`; `start` prints the notice with P.
 - [ ] Rule 1 negative: `parent_session` = S → not a delegate.
-- [ ] Rule 2: `subagent_start` with `agent_id` = S under session P → delegate of P.
+- [ ] Rule 2: `subagent_start` with `agent_id` = S under session P → delegate of P; `phase` refuses.
 - [ ] A Claude session in a task worktree (markers set) is never looked up (spy on `spool.read` count, or
   a spool that would make it a delegate if read → still the controller).
 - [ ] No hook events for S → not a delegate; no identity → unchanged.
@@ -424,8 +430,9 @@ sentence), `tests/test_doctor.py` (declared edit of the hint assertion), `tests/
 def new_task(args, ctx) -> int:
     ...validate slug, tier, request as today...
     ctx.require_project()                                # first, as today ("no .harness/project.json here")
+    task_id = f"{date.today().isoformat()}-{args.new}"
     if gitio.is_main_checkout(ctx.root):
-        return _new_worktree_task(args, ctx, request)
+        return _new_worktree_task(args, ctx, request, task_id)
     results = doctor.run(doctor.agent_install(ctx) + doctor.PRE_START, ctx, task_id)   # today's in-place flow
     if not doctor.passed(results):
         print(doctor.format(results)); return 1
@@ -434,17 +441,16 @@ def new_task(args, ctx) -> int:
     print(f"task {task_id} registered; the clock is running.\nharness checkout: {REPO}")   # today's line
     return 0
 
-def _new_worktree_task(args, ctx, request) -> int:
+def _new_worktree_task(args, ctx, request, task_id) -> int:
     agent = _task_agent(args.agent, ctx)                # --agent; one RUNNING_VAR; the one found agent
-    task_id = f"{date.today().isoformat()}-{args.new}"
+    p = ctx.require_project()
+    gitio.fetch(ctx.root, p["integration_remote"], p["default_branch"])   # first: the checks read fresh refs
     results = doctor.run(doctor.agent_install(ctx) + [doctor.probe_not_cloud], ctx, task_id)
     if _task_id_used(ctx, task_id):
         results.append(("unused", False, "use a new slug"))
     if not doctor.passed(results):
         print(doctor.format(results)); return 1
-    p = ctx.require_project()
     path = ctx.root.parent / "worktrees" / ctx.root.name / agent / task_id
-    gitio.fetch(ctx.root, p["integration_remote"], p["default_branch"])
     try:
         gitio.worktree_add(ctx.root, path, task_id, f"{p['integration_remote']}/{p['default_branch']}")
     except HarnessError as e:
@@ -460,8 +466,8 @@ def _new_worktree_task(args, ctx, request) -> int:
             registered = _register(args, wctx, request) == 0
     finally:
         if not registered:                              # a failed probe, a used id, an exception, Ctrl-C
-            gitio.worktree_remove(ctx.root, path)       # --force
-            gitio.branch_delete(ctx.root, task_id)      # -D
+            gitio.worktree_remove(ctx.root, path)       # --force; check=False: never masks the first error
+            gitio.branch_delete(ctx.root, task_id)      # -D; check=False
     if not registered:
         return 1
     print(f"task {task_id} registered in {path}; the clock is running: open {agent} there now. "
@@ -554,7 +560,11 @@ in the test.
   `apply_patch` (real models; format-assumed in the test). Such a call is not also fed to `inspect()`.
 - `function_call` `spawn_agent` → `agent_calls` (`type` = `default`, the `agent_type` Codex records for a
   built-in helper's span).
-- Every other call → `tools["other"]`, uninspected when it carries command-like keys (Claude's rule).
+- `write_stdin` with non-empty `chars` (text typed into a running shell, e.g. `gh pr merge 1\n`) →
+  `tools["shell"]` and uninspected: it can run anything and the reader cannot see it as a command line.
+- Every other call → `tools["other"]`, uninspected when it carries command-like keys (Claude's rule), so
+  `wait_agent`, `update_plan` and the like stay clean.
+- `tools` keys use Claude's vocabulary (`shell`, `harness`, `edit`, `agent`, `other`): the page prints them.
 - `event_msg` `token_count` with `info` present → `usage` = that `info.total_token_usage` (the last one),
   mapped `input_tokens`→`input`, `output_tokens`→`output`, `reasoning_output_tokens`→`thinking`,
   `cached_input_tokens`→`cache_read`, `cache_write_input_tokens`→`cache_write`.
@@ -588,6 +598,7 @@ pass `now = 60 * 86_400_000`, well past any capture date):
 - [ ] A synthetic `exec_command` `apply_patch` with `*** Update File: .harness/runs/x/state.json` and
   `Exit code: 0` → one harness edit; the `shell` argv and `custom_tool_call` forms likewise (format-assumed).
 - [ ] A synthetic refused output (each pattern) → refused.
+- [ ] A synthetic `write_stdin` with `chars` → `uninspected == 1`; a `wait_agent` call → not uninspected.
 - [ ] Window: calls after `until` not counted.
 - [ ] `cost_summary`: Claude-only inputs give today's dict plus `tokens_only: 0` (pin with an existing
   test's expected dict); an open Claude session without a cost record → `None`, as today; Codex-only →
@@ -604,7 +615,8 @@ pass `now = 60 * 86_400_000`, well past any capture date):
   `"summary/usd_runs"`, `t.cost && t.cost.usd != null ? t.cost.usd : -1`, `"tokens only"`,
   `" token-only sessions"`, `" with dollar totals"`.
 - [ ] Browser acceptance (`logbook/tests/accept.py`, which renders `shapes()`; needs Python Playwright: install
-  it in the session if possible, else run it on the Mac in Task 12) with a token-only task in
+  it in the session — verified possible: Playwright 1.64 with a `PLAYWRIGHT_BROWSERS_PATH` folder whose
+  `chromium*-1248` names point to the preinstalled `/opt/pw-browsers/*-1246` builds — else on the Mac) with a token-only task in
   `logbook/tests/shapes.py`: the tile text and the tokens caption render; every number prints through
   `num(…, tp(t, "cost/tokens_only"))` or `vp(key, "summary/usd_runs")` (accept.py fails on a digit outside
   a `[data-src]` element); the table sort uses `t.cost && t.cost.usd != null ? t.cost.usd : -1`.
@@ -657,14 +669,14 @@ and their fact tests.
 - [ ] On the Mac (through the user's Remote Control session, read-only for the user's real state): run
   `logbook/tests/parity.py <projects…> --now-ms <fixed> --keep <dir>` once, to freeze a copy of the state
   dir; then for each checkout H (`main` at `88c0e8c`, and this branch) run parity's `SCORER` snippet with
-  its output line changed to `out[name + "/" + c["task_id"]] = c` (whole cards):
-  `python3 -B -c "<snippet>" H <dir>/state <now_ms> '<projects json>' > cards-H.json`; `diff` the two files.
-  Identical (`as_of` included) or it is a bug.
-- [ ] On the Mac: run `codex_facts.py` (v2) once; replace `tests/fixtures/codex/logs/{e-0,c-0,c-1}.jsonl`
-  with the Mac's (sha256 in the commit) and rerun `tests/test_logbook.py`: the pinned counts hold.
+  its output line changed to `out[name + "/" + c["task_id"]] = c` (whole cards), with the same `projects`
+  JSON parity builds (`root`, `name`, `project`, `ref`, from `build.load_projects`; the PR body carries the
+  exact command): `python3 -B -c "<snippet>" H <dir>/state <now_ms> '<projects json>' > cards-H.json`;
+  `diff` the two files. Identical (`as_of` included) or it is a bug.
+- [ ] On the Mac: run `codex_facts.py` (v2) once. Its fixtures' field lists equal the committed fixtures';
+  replace `tests/fixtures/codex/logs/{e-0,c-0,c-1}.jsonl` with the Mac's (sha256 in the commit) and rerun
+  `tests/test_logbook.py`: the pinned counts hold.
 - [ ] On the Mac: `logbook/tests/accept.py` with the shapes (if not run in the session).
-- [ ] On the Mac: `python3 tests/smoke/codex_facts.py --out <tmp>` with the Mac's Codex; fixture field
-  lists equal the committed fixtures'.
 - [ ] Push; open the PR: summary, the spec link, the declared test edits, the re-score result, the rollout:
   1. merge; `git pull` in the harness checkout;
   2. `harness install --user` (sets up Codex; reruns Claude's bootstrap copy);
@@ -679,6 +691,7 @@ and their fact tests.
 **Files:** `docs/superpowers/specs/2026-10-08-lean-harness-v0-product-spec.md` and
 `docs/superpowers/specs/2026-10-16-lean-harness-slice-2a-codex-spec.md` (the §3 row).
 
+- [ ] In the 2a spec's §5, "Prints the one manual step" adds "(when it added hook groups)" (plan round 3).
 - [ ] In the 2a spec's §3 table, the `claude.py` row adds "and an ignored `env=None` parameter on
   `install_user`/`uninstall_user`" (plan review round 1).
 - [ ] Apply every §14 row of the 2a spec exactly; re-read §4.3–4.4, §6.9, §7, §8, §11, §13–14, §16–17 for
@@ -736,3 +749,21 @@ and their fact tests.
 | S14 block removal after user edits | Falls back to element removal |
 | S15 polish | Task 3 wording; Task 13 files; `_backup` import; blank line removed with the block; `agent_calls` type `default` |
 | Cut: mock-server unit test | Import check |
+
+### Plan round 3 (r4 → r5): Fable (max effort) REVISE (one major)
+
+| Finding | Resolution |
+|---|---|
+| T1 `write_stdin` could hide a GitHub write | Counted as a shell call and uninspected; other unknown calls keep Claude's rule; tests |
+| T2 fixtures' `cwd` does not exist | Replaced by the Sandbox worktree in the hook test |
+| T3 `task_id` before definition | Computed in `new_task`, passed to both flows |
+| T4 cleanup masking the first error | `check=False` |
+| T5 `want` for block removal | Without the whole table |
+| T6 `codex_hooks` fix text | Names both causes |
+| T7 the loud failure untested | Task 6 assertion |
+| T8 rule 2 `phase` refusal | Asserted |
+| T9 the scorer snippet's input | Same projects JSON as parity; exact command in the PR |
+| T10 `tools` keys | Claude's vocabulary |
+| §5 manual step "first install" | Task 13 amends §5 |
+| Optional: fetch before the checks | Taken |
+| Cut: two Mac fact runs | One |
