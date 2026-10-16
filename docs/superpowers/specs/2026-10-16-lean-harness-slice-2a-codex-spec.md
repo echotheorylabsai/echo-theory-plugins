@@ -303,6 +303,8 @@ app-server's `hooks/list`, and hand-written trust entries.
 
 **Ran:** Linux container, Codex CLI 0.163.0 (2026-10-16); the user's Mac, macOS 27.0, Codex CLI 0.160.0,
 Python 3.12.8, git 2.54.0 (2026-10-16, through a Remote Control session). All four runs passed on both.
+A second Mac run (script v2, five runs including the session-log run E, all passed) confirmed every fact
+again; lean-harness's Logbook reader tests pass on its session logs (12 tests).
 
 | # | Fact | Mac 0.160 | Linux 0.163 | Used in |
 |---|---|---|---|---|
@@ -312,7 +314,7 @@ Python 3.12.8, git 2.54.0 (2026-10-16, through a Remote Control session). All fo
 | 0b.5 | Hook processes never see their own session's `CODEX_THREAD_ID` (v0 §16 holds); shells see it | ✅ | ✅ | §7 |
 | 0b.6 | Trust: `[hooks.state."<key>"]` with `trusted_hash` (= `hooks/list` `currentHash`, `sha256:…`, not derivable from the entry) and `enabled`; the key's path is the absolute, symlink-resolved `hooks.json`; a bare `hooks.json:…` key is not honored; with valid entries, trusted hooks run under plain `codex exec` and untrusted ones are skipped silently; `[features].hooks` is stable and on by default | Key form ✅ (`hooks/list` `key_example` under `/private/var/…`); trusted-run: v0 §16 | ✅ | §5, §8 |
 | 0b.7 | `SessionEnd` hook timeout: default 1 s, clamped to at most 3 s; `timeout: 3` accepted without warning | ✅ | ✅ | §5, §13 |
-| 0b.8 | Session log: `session_meta`, `turn_context` (`model`, `effort`), `function_call` items (`exec_command` with `cmd`), cumulative `token_count`; no dollars | — | ✅ | §9 |
+| 0b.8 | Session log: `session_meta`, `turn_context` (`model`, `effort`), `function_call` items (`exec_command` with `cmd`), cumulative `token_count`; no dollars | ✅ (v2 run: the reader's tests pass on its logs) | ✅ | §9 |
 | 0b.9 | Sandboxed shell: `CODEX_SANDBOX=seatbelt` on macOS (absent on Linux); hook `permission_mode` reads `bypassPermissions` under both modes in `exec`, so it is not a sandbox signal | ✅ | ✅ (Linux form) | §8 |
 
 **Left for P5 (the desktop app):** the app runs user-level hooks from `$CODEX_HOME/hooks.json` and sends
