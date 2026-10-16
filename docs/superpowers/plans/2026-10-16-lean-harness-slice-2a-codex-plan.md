@@ -21,19 +21,21 @@ regenerated in Task 3 with `tests/smoke/codex_facts.py`.
 **Execution:** one implementer in one session (tasks share `adapters/`, `doctor.py`, `start.py`), then the
 user's review protocol on the PR: an independent adversarial review (Fable, max effort) until APPROVE.
 
-**Revision:** r2 (2026-10-16), aligned with the approved spec (r7).
+**Revision:** r3 (2026-10-16): plan review round 1 applied (review log at the end).
 
 ## Global constraints
 
 - Python 3.12 stdlib only; tests are `unittest` classes; the suite stays green after every task (the two
   "unwritable state dir" tests fail only when run as root, as on `main`).
 - Additive (§1): no test of the Claude adapter, recording or scoring is edited. The only edits to existing
-  tests are the two declared ones: `CLEARED` in `tests/helpers.py` (Task 1) and the main-checkout hint in
-  `tests/test_doctor.py` (Task 8).
+  tests are the three declared ones: `CLEARED` in `tests/helpers.py` (Task 1), the main-checkout hint in
+  `tests/test_doctor.py` (Task 8), and the no-reader agent in `tests/test_logbook.py`
+  `test_readers_are_chosen_by_the_recorded_agent` (Task 9).
+- Shared Codex test setup lives in one new file, `tests/codex_helpers.py` (Task 5), never in `helpers.py`.
 - No new harness commands; no new event kinds or fields (schema v1). One new optional flag:
   `start --new --agent`.
 - Nothing project-specific in code or instruction files.
-- `AGENTS.md` and the phase files do not change. `hooks/bootstrap.md` gains exactly the §15 sentence.
+- `AGENTS.md` and the phase files do not change. `hooks/bootstrap.md` gets exactly §15's two edits.
 - Every write to a user file under `$CODEX_HOME` is append-only or a marked block, never reorders, never
   writes a file it cannot parse, and backs up before uninstall (and before the `config.toml` edit).
 
@@ -116,8 +118,8 @@ PR merges; Task 12 lists the rollout that precedes them.
   `agent_install(ctx)`.
 
 **Tests first (`tests/test_found.py`):**
-- [ ] `found_agents` for: empty home → `["claude"]`; `.claude` only → `["claude"]`; `.codex` only →
-  `["codex"]` (after Task 6; until then assert with a stub registry); both → both.
+- [ ] `found_agents` for: empty home → `["claude"]`; `.claude` only → `["claude"]` (the `.codex` cases are
+  asserted once, in Task 6, with the live registry).
 - [ ] Claude-only home: `install --user` prints today's lines in today's order, then `agents: claude` as the
   only extra line (the expected lines are the ones `tests/test_install.py` already pins).
 - [ ] An agent session's `start` runs only its agent's install probes (doctor event `checks` keys).
@@ -130,9 +132,9 @@ PR merges; Task 12 lists the rollout that precedes them.
 **Files:** `harness/adapters/codex.py` (new: events part), `tests/fixtures/codex/*.json` (new, 7 files),
 `tests/test_adapter_codex.py` (new).
 
-**Fixtures:** run `tests/smoke/codex_facts.py --out <tmp>` (Task 10 adds the script; in this task copy it
-from the scratchpad first) against Codex in the container; copy `<tmp>/fixtures/*.json` (paths already
-scrubbed) to `tests/fixtures/codex/`. Files: `SessionStart`, `UserPromptSubmit`,
+**Fixtures:** copy the scrubbed payloads from a `codex_facts.py` run (the container's
+`facts-run2/fixtures/*.json`, or a fresh run if the session has Codex) to `tests/fixtures/codex/`, and
+record their sha256 in the commit message; Task 12 compares their field lists with the Mac's. Files: `SessionStart`, `UserPromptSubmit`,
 `UserPromptSubmit-subagent`, `Stop`, `SubagentStart`, `SubagentStop`, `SessionEnd`.
 
 **Interfaces (mirroring `claude.py`):** `NAME = "codex"`, `IDENTITY_VAR = "CODEX_THREAD_ID"`,
@@ -205,8 +207,12 @@ def to_event(hook_event, payload, env, foreign_vars):
 
 ### Task 4: Codex install and uninstall (§5)
 
-**Files:** `harness/adapters/codex.py` (install part), `harness/codexconf.py` (new: the `config.toml` text
-edit and its verification), `tests/test_install_codex.py` (new).
+**Files:** `harness/adapters/codex.py` (install part, including the `config.toml` editor: one adapter
+module, D7), `harness/adapters/claude.py` (an ignored `env=None` parameter on `install_user` /
+`uninstall_user`; Task 13 records it in the spec's §3 row), `tests/test_install_codex.py` (new).
+
+Tests in this task call `codex.install_user(home, dispatcher, env)` / `codex.uninstall_user(...)` directly
+(unit level, temp home): the CLI reaches Codex only after Task 6 registers it.
 
 **Interfaces:** `codex_home(home, env) -> Path` (`env["CODEX_HOME"]` or `home/.codex`);
 `found(home, env)`; `install_user(home, dispatcher, env) -> list[str]`;
@@ -222,7 +228,7 @@ event append, if no handler in that event already has the exact command, a group
 bootstrap: end -->\n`. Absent file → created with the block; block present and current → no change; block
 present and stale → replaced in place; no block → appended after a blank line.
 
-**config.toml (`codexconf.add_root(path, root) / remove_root(path, root)`):**
+**config.toml (`add_root(path, root) / remove_root(path, root)` in `codex.py`):**
 
 ```python
 BLOCK = "\n[sandbox_workspace_write]\nwritable_roots = [{root}]\n"
@@ -254,10 +260,16 @@ def add_root(path: Path, root: str) -> str | None:
 section → insert `writable_roots = [lit]` right after the header; `writable_roots = [` in that section →
 insert `lit, ` after the `[` (TOML allows a trailing comma). Every other shape fails verification and gets
 the manual line. `remove_root` reverses: removes `BLOCK` verbatim if present, else the `lit, `/`lit` text
-inside the array, verified the same way (`want` = before minus the root).
+inside the array, verified the same way (`want` = before minus the root); when the remaining text is
+empty (install created the file), the file is removed. It never raises: a failed verification restores the
+file and returns the line "`config.toml`: remove <lit> from writable_roots by hand", so the uninstall's
+other change lines still print.
 
 **Override:** `AGENTS.override.md` in the Codex home → `HarnessError` before any Codex write (after Claude's
 lines were printed, Task 2).
+
+**Manual step (§5):** when any hook group was added, `install_user` also returns the line "open Codex, run
+`/hooks`, and trust the harness hooks" (the same string as `codex_hooks_trusted`'s fix text).
 
 **Uninstall:** backup `hooks.json`; drop each harness handler (and a group it leaves empty); list, per
 event, the user's groups that sat after a removed harness group: "`<event>` group <i> moved: Codex skips it
@@ -271,16 +283,26 @@ until you trust it again in `/hooks`"; remove the marked block (and `AGENTS.md` 
 - [ ] `config.toml` shapes: absent file; no table; table without key; single-line array; multi-line array;
   empty array; a `[profiles.x.sandbox_workspace_write]` decoy (must not be edited; verification passes
   only for the right table); an inline-table form → manual line, file restored.
-- [ ] Override file refuses; Claude's files from the same run exist and were printed.
+- [ ] Override file: `install_user` raises before writing anything under the Codex home.
 - [ ] Uninstall after a clean install restores all three files byte-for-byte (`AGENTS.md`/`config.toml`
-  absent before → absent after); a user group added after install is listed as moved.
+  absent before → absent after); a user group added after install is listed as moved; a `config.toml` the
+  remover cannot verify is restored and named in a manual line, and the other lines still return.
+- [ ] The manual trust line is returned on the first install only.
 - [ ] Symlinked `CODEX_HOME` works (writes through to the target directory, which is where Codex reads).
 
 ---
 
 ### Task 5: Codex doctor probes (§8)
 
-**Files:** `harness/adapters/codex.py` (probes), `tests/test_doctor_codex.py` (new).
+**Files:** `harness/adapters/codex.py` (probes), `tests/codex_helpers.py` (new), `tests/test_doctor_codex.py`
+(new).
+
+**`tests/codex_helpers.py`:** `trust_all(codex_home: Path)` appends to `config.toml` one
+`[hooks.state."<resolved hooks.json>:<snake>:<gi>:<hi>"]` table per harness hook position
+(`trusted_hash = "sha256:test"`, `enabled = true`); `codex_ready(home: Path, env: dict) -> dict` creates
+`home/.codex`, returns `env` with `CODEX_HOME` set (used with the CLI once Task 6 registers Codex: it then
+runs `install --user` and `trust_all`). Tasks 5, 6, 7, 9 and 10 use it. Codex ignores these entries under
+`--dangerously-bypass-hook-trust` (0b.6), so the smoke can use them too.
 
 **Probes** (`doctor_probes()` returns them in this order): `codex_hooks`, `codex_hooks_trusted`,
 `codex_writable_root`, `codex_bootstrap`, `codex_no_override`, `codex_full_access`.
@@ -303,12 +325,15 @@ def _trusted(ctx) -> list[str]:
     return missing
 ```
 
-`codex_full_access`: fails only when `ctx.identity.agent == "codex"` and `ctx.env.get("CODEX_SANDBOX")`.
+`codex_full_access`: fails only when `ctx.identity.agent == "codex"` and
+`any(ctx.env.get(v) for v in ("CODEX_SANDBOX", "CODEX_SANDBOX_NETWORK_DISABLED"))` (macOS sets both;
+Linux only the second).
 
-**Tests first:** each probe passes on a fresh install with hand-written trust entries (absolute key) and
-fails with its fix text when: a group is missing; `[features] hooks = false`; no trust entry; a bare
-`hooks.json:…` key; `enabled = false`; root missing; stale block; override present; Codex identity with
-`CODEX_SANDBOX=seatbelt`. A symlinked `CODEX_HOME` with entries keyed by the resolved path passes.
+**Tests first** (unit level: probes called with a small context object; `codex.install_user` then
+`trust_all`): each probe passes on that fresh install and fails with its fix text when: a group is missing;
+`[features] hooks = false`; no trust entry; a bare `hooks.json:…` key; `enabled = false`; root missing;
+stale block; override present; Codex identity with `CODEX_SANDBOX=seatbelt`, and with only
+`CODEX_SANDBOX_NETWORK_DISABLED=1`. A symlinked `CODEX_HOME` with entries keyed by the resolved path passes.
 
 ---
 
@@ -326,6 +351,12 @@ module).
   Claude child (Claude SessionStart with `CODEX_THREAD_ID=P` in the hook env): the child's markers carry
   `HARNESS_PARENT_SESSION=P`; its `check` has `agent=claude`, `parent_session=P`, `delegate=true`.
 - [ ] `harness hook codex <Event>` with each fixture lands in the spool (Task 3's deferred test).
+- [ ] CLI (moved from Task 4): with a `.codex` home, `install --user` prints Claude's lines, then raises on
+  an `AGENTS.override.md` with Claude's files in place; `uninstall --user` lists a user group that sat after
+  a harness group.
+- [ ] Codex-only home (`.codex` only): `found_agents` → `["codex"]`; `install --user` writes no `.claude/*`
+  and prints `agents: codex`; `doctor`'s install group has no `claude_*` probe. Both homes → both, in
+  registry order.
 - [ ] With no Codex home: `doctor` output, `install --user` lines (except the `agents:` line) and the
   spool records of a full Claude task (`Sandbox.through_triage`) are identical to `main`'s (assert the
   probe-name list and the absence of any `codex` field value).
@@ -343,14 +374,14 @@ def _from_log(ident, env, state_dir) -> identity.Identity:
     subagent_start names it as a helper (rule 2)."""
     if ident.session_id is None or ident.delegate or env.get(identity.PARENT_VAR):
         return ident
-    sid, parent = ident.session_id, None
-    for e in spool.read(state_dir):
-        if e.get("source") != "hook":
-            continue
-        if e.get("kind") == "session_start" and e.get("session_id") == sid:
-            parent = e.get("parent_session") if e.get("parent_session") != sid else None
-        elif e.get("kind") == "subagent_start" and e.get("agent_id") == sid and parent is None:
-            parent = e.get("session_id")
+    sid = ident.session_id
+    hooks = [e for e in spool.read(state_dir) if e.get("source") == "hook"]
+    starts = [e for e in hooks if e.get("kind") == "session_start" and e.get("session_id") == sid]
+    r1 = starts[-1].get("parent_session") if starts else None          # rule 1: the latest session_start
+    r1 = None if r1 == sid else r1
+    r2 = next((e.get("session_id") for e in hooks                    # rule 2: named as a built-in helper
+               if e.get("kind") == "subagent_start" and e.get("agent_id") == sid), None)
+    parent = r1 or r2
     return identity.Identity(sid, ident.agent, parent, True) if parent else ident
 ```
 
@@ -381,12 +412,16 @@ sentence), `tests/test_doctor.py` (declared edit of the hint assertion), `tests/
 ```python
 def new_task(args, ctx) -> int:
     ...validate slug, tier, request as today...
+    ctx.require_project()                                # first, as today ("no .harness/project.json here")
     if gitio.is_main_checkout(ctx.root):
         return _new_worktree_task(args, ctx, request)
     results = doctor.run(doctor.agent_install(ctx) + doctor.PRE_START, ctx, task_id)   # today's in-place flow
     if not doctor.passed(results):
         print(doctor.format(results)); return 1
-    return _register(args, ctx, request)                 # unchanged from here on
+    if _register(args, ctx, request) != 0:
+        return 1
+    print(f"task {task_id} registered; the clock is running.\nharness checkout: {REPO}")   # today's line
+    return 0
 
 def _new_worktree_task(args, ctx, request) -> int:
     agent = _task_agent(args.agent, ctx)                # --agent; one RUNNING_VAR; the one found agent
@@ -423,9 +458,11 @@ def _new_worktree_task(args, ctx, request) -> int:
     return 0
 ```
 
-`_register(args, ctx, request)` is today's body after the probes, unchanged: the locked `probe_unused`, the
-task folder, the `start` event (`context.event(ctx, ...)`, so the worktree flow's identity override gives
-it the task's agent and no session). `_task_agent`: `--agent` must be in `REGISTRY`; else the
+`_register(args, ctx, request)` is today's body after the probes, minus its final print (each flow prints
+its own line): the locked `probe_unused`, the task folder, the `start` event (`context.event(ctx, ...)`, so
+the worktree flow's identity override gives it the task's agent and no session); returns 0 or 1. The
+worktree flow's last line adds `harness checkout: <path>` after §15 step 6's text, as today's line does
+(additive). `_task_agent`: `--agent` must be in `REGISTRY`; else the
 adapters whose `RUNNING_VAR` is set — exactly one wins; else `found_agents` — exactly one wins; else
 `HarnessError("pass --agent " + "|".join(REGISTRY))`. `_task_id_used`: §15 step 2's uniqueness check run
 for branch `<task-id>`: a `start` event with that task id or branch in the spool, a remote branch
@@ -456,9 +493,10 @@ open the next session."
 - [ ] A used task id refuses before `git worktree add` (no folder, no branch).
 - [ ] An existing branch `<task-id>` (an interrupted run): refuses with the two recovery commands; nothing
   else created.
-- [ ] A pre-start probe failing inside the new worktree (simulate: make `probe_up_to_date` fail by moving
-  the remote between fetch and add, or patch via env-only hook if needed) → worktree and branch removed,
-  nothing in the spool.
+- [ ] A pre-start probe failing inside the new worktree: a `.git/hooks/post-checkout` in the Sandbox's main
+  repo that writes `stray.txt` (git runs it on `worktree add`), so `probe_clean` fails → worktree and branch
+  removed, nothing in the spool. And the locked check failing: push `.harness/runs/<task-id>/state.json`
+  to the remote without fetching in the main checkout → same cleanup.
 - [ ] In a linked worktree: behaves exactly as today (existing `test_start.py` untouched).
 - [ ] Doctor hint text in the main checkout; `tests/test_doctor.py`'s hint assertion edited to it.
 - [ ] `test_instructions` still passes (the sentence names only `harness start`).
@@ -467,7 +505,9 @@ open the next session."
 
 ### Task 9: Logbook — Codex logs and token-only cost (§9)
 
-**Files:** `logbook/build.py`, `logbook/viewer.html`, `logbook/README.md` (if it documents cost fields),
+**Files:** `logbook/build.py`, `logbook/viewer.html`, `logbook/README.md` (documents `cost.tokens_only`, a
+null `usd`, the "tokens only" captions and `summary.usd_runs`), `logbook/tests/shapes.py` (a token-only
+task shape for the browser test),
 `tests/test_logbook.py` (new tests, plus the declared edit: `test_readers_are_chosen_by_the_recorded_agent`
 uses `gemini` as the agent with no reader), recorded Codex log fixtures `tests/fixtures/codex/logs/{e-0,c-0,c-1}.jsonl`
 captured on the Mac by `codex_facts.py` (Task 10): run E's log (`logs/e-0.jsonl`: a `harness check C1`
@@ -480,15 +520,17 @@ in the test.
 
 **`read_codex_log(path, until, with_prompts=False, since=None)`** returns the same keys as
 `read_claude_log` plus `"token_only": True`:
-- `session_meta` → known; `origin = {"entrypoint": originator, **first_prompt}` (first `event_msg`
-  `user_message` text when `with_prompts`).
+- `session_meta` → known; `origin = {"entrypoint": originator}` (no first prompt: exec logs carry it only
+  as a user message after `<environment_context>`).
 - `turn_context` → remember `model`, `effort`; at the end `models[last model] = 1` and `effort` = the last
   effort (a key Claude's reader lacks; `session_out` uses it when the records carry no effort).
 - `response_item` `function_call` `exec_command` (`arguments.cmd`) or `shell` (`arguments.command`, a list
   → `shlex.join`) → the same `inspect()` path as Claude's `_SHELL_TOOLS` branch (harness commands,
   uninspected, GitHub writes, harness-file writes, rebases); its `function_call_output` → outcome from
   `Process exited with code N` or, for an intercepted `apply_patch`, `Exit code: N` (0 → done, else
-  failed); a sandbox or approval refusal text → refused; none → no result.
+  failed); a refusal text → refused, matched by a Codex-specific pattern from the 0.163 binary's strings
+  (`sandbox denied exec error`, `exec command rejected by user`, `rejected by user`, `requires approval`;
+  tested from a synthetic output and marked format-assumed); none → no result.
 - `apply_patch` → an edit of a harness-owned file when a `*** (Add|Update|Delete) File:` path matches
   `HARNESS_FILE`, in all three recorded forms: an `exec_command` whose `cmd` starts with `apply_patch`
   (observed on 0.163: Codex intercepts it, records an `item_completed` `FileChange` with absolute paths, and
@@ -496,12 +538,13 @@ in the test.
   `apply_patch` (real models; format-assumed in the test). Such a call is not also fed to `inspect()`.
 - `function_call` `spawn_agent` → `agent_calls` (`type` = `codex:subagent`).
 - Every other call → `tools["other"]`, uninspected when it carries command-like keys (Claude's rule).
-- `event_msg` `token_count` → `usage` = the last `info.total_token_usage`, mapped to the summary's names:
-  `input_tokens`, `output_tokens`, `reasoning_output_tokens`, `cached_input_tokens`,
-  `cache_write_input_tokens`.
+- `event_msg` `token_count` with `info` present → `usage` = that `info.total_token_usage` (the last one),
+  mapped `input_tokens`→`input`, `output_tokens`→`output`, `reasoning_output_tokens`→`thinking`,
+  `cached_input_tokens`→`cache_read`, `cache_write_input_tokens`→`cache_write`.
 - Lines outside `[since, until)` are not counted (Claude's rule); unparsable lines → `skipped`.
 
-`READERS["codex"] = read_codex_log`.
+`READERS["codex"] = read_codex_log`; `TOKEN_ONLY = {"codex"}` (agents whose logs carry no dollars), so
+`cost_summary` classifies `(agent, None)` pairs (missing logs) without a log to read.
 
 **Cost:** `cost_summary(pairs)` takes `(agent, log)` pairs per §9 (the call site passes main, side and
 delegate sessions as today, plus Codex helper logs read from `agent_transcript_path`); a log with
@@ -518,21 +561,31 @@ present, outside the `if (md.length)` model-bar block; no bar for token-only mod
 "N tasks with dollar totals"; `partialCost` unchanged (it reads `sessions`/`logs_total`). The page names no
 agent (`test_no_adapter_names_or_prefixes`).
 
-**Tests first:**
-- [ ] `read_codex_log` on the fixture: counts for harness commands, a `gh pr merge` write, a harness-file
-  edit, one agent call, usage numbers, model, `token_only`.
+**Tests first** (synthetic Codex records use a new `ck(sid, kind, t, log=None, parent=None, **f)` helper
+in the new tests, since `by()`/`hk()` hard-code Claude; calls are windowed from `T0`, so the fixture tests
+pass `now ≥ 7 * 86_400_000`):
+- [ ] `read_codex_log` on `e-0.jsonl`: `harness_cmds == 1`, one `gh pr merge` write, `harness_edits == 0`
+  (the patch touches `.harness/runs/x/note.md`, not a harness-owned file), `effort == "high"`,
+  `usage["output"] == 20`, the model, `token_only`; on `c-0.jsonl`: one agent call.
+- [ ] A synthetic `exec_command` `apply_patch` with `*** Update File: .harness/runs/x/state.json` and
+  `Exit code: 0` → one harness edit; the `shell` argv and `custom_tool_call` forms likewise (format-assumed).
+- [ ] A synthetic refused output (each pattern) → refused.
 - [ ] Window: calls after `until` not counted.
 - [ ] `cost_summary`: Claude-only inputs give today's dict plus `tokens_only: 0` (pin with an existing
   test's expected dict); an open Claude session without a cost record → `None`, as today; Codex-only →
   `usd` null, tokens set, `tokens_only: 1`, not partial; mixed with all Claude logs read → not partial.
 - [ ] `batch_summary` with one Codex-only task builds; `usd_runs` excludes it.
 - [ ] A Codex helper's log adds its tokens to `tokens_only` and the sums.
+- [ ] A Claude S1 with a `subagent_stop` whose `agent_transcript_path` points to a Claude log with a cost
+  record: `cost` is today's dict plus `tokens_only: 0` (the helper log is not an input).
 - [ ] The declared edit: `read_log("gemini", …)` is `no_reader`; `read_log("codex", good Claude log, …)` is
   `unsupported`.
 - [ ] The Logbook build's parity check passes on a Sandbox project with a Codex task (Codex hooks fired
   through `harness hook codex`).
-- [ ] Browser acceptance (`logbook/tests/accept.py`) extended with a token-only task: the tile text and the
-  model list render.
+- [ ] Browser acceptance (`logbook/tests/accept.py`, which renders `shapes()`) with a token-only task in
+  `logbook/tests/shapes.py`: the tile text and the tokens caption render; every number prints through
+  `num(…, tp(t, "cost/tokens_only"))` or `vp(key, "summary/usd_runs")` (accept.py fails on a digit outside
+  a `[data-src]` element); the table sort uses `t.cost && t.cost.usd != null ? t.cost.usd : -1`.
 
 ---
 
@@ -547,7 +600,8 @@ agent (`test_no_adapter_names_or_prefixes`).
   scrubbed (paths; `session_meta.base_instructions` dropped), to `<out>/logs/`.
 - [ ] A unit test runs its mock server class standalone (no Codex needed) to keep it importable.
 - [ ] `run_smoke.py --agent codex`: throwaway `CODEX_HOME` (with the user's `auth.json` copied in when
-  present, deleted in a `finally`; else skip with a message), `install --user` into the temp home, a scripted task driven by
+  present, deleted in a `finally`; else skip with a message), `install --user` into the temp home, then
+  `trust_all` (so the agent's `harness start` passes `codex_hooks_trusted`), a scripted task driven by
   `codex exec -s danger-full-access --dangerously-bypass-hook-trust "<prompt>" < /dev/null`, then
   `harness score` and the expected card fields; never touches the real `~/.codex`.
 
@@ -578,10 +632,10 @@ and their fact tests.
 ### Task 12: Regression, the Mac checks and the PR
 
 - [ ] Full suite green (only the two root-only failures in the container).
-- [ ] On the Mac (through the user's Remote Control session, read-only for the user's real state): copy
-  `~/.local/state/harness` to a temp dir; for each project, run `score.collect(ctx, project, ref, now_ms)`
-  at one fixed `now_ms` from a `main` (`88c0e8c`) checkout and from this branch, both over the copy; the
-  cards must be identical (`as_of` included); any difference is a bug.
+- [ ] On the Mac (through the user's Remote Control session, read-only for the user's real state): run
+  `logbook/tests/parity.py <projects…> --now-ms <fixed> --installed <checkout> --keep <dir>` twice, once
+  with a `main` (`88c0e8c`) checkout and once with this branch (it scores a frozen copy of the state dir
+  with `SCORER`); the two kept card sets must be identical (`as_of` included); any difference is a bug.
 - [ ] On the Mac: `python3 tests/smoke/codex_facts.py --out <tmp>` with the Mac's Codex; fixture field
   lists equal the committed fixtures'.
 - [ ] Push; open the PR: summary, the spec link, the declared test edits, the re-score result, the rollout:
@@ -597,5 +651,39 @@ and their fact tests.
 
 **Files:** `docs/superpowers/specs/2026-10-08-lean-harness-v0-product-spec.md`.
 
+- [ ] In the 2a spec's §3 table, the `claude.py` row adds "and an ignored `env=None` parameter on
+  `install_user`/`uninstall_user`" (plan review round 1).
 - [ ] Apply every §14 row of the 2a spec exactly; re-read §4.3–4.4, §6.9, §7, §8, §11, §13–14, §16–17 for
   sentences that now contradict them and fix each in the same commit.
+
+
+---
+
+## Review log
+
+### Plan round 1 (r2 → r3): Fable (max effort) REVISE
+
+| Finding | Resolution |
+|---|---|
+| R1 Task 4/5 CLI tests before Codex is registered | Tasks 4–5 test the adapter directly; the CLI tests move to Task 6 |
+| R2 no Codex test or smoke can pass `codex_hooks_trusted` | `tests/codex_helpers.py` (`trust_all`, `codex_ready`), used by Tasks 5, 6, 7, 9, 10 |
+| R3 `codex_full_access` missed the Linux variable | Both variables (Task 5) |
+| R4 fixture has no harness-owned edit | Exact counts on `e-0`; the positive case from a synthetic line |
+| R5 Codex refusal texts | Named patterns, format-assumed test |
+| R6 rule order in `_from_log` | Two scans: latest `session_start`, else the first `subagent_start` |
+| R7 double print | `_register` returns without printing; each flow prints its line |
+| R8 failure-path test | `post-checkout` hook and a pushed task folder |
+| R9 `require_project` first | Kept first in `new_task` |
+| R10 `remove_root` must not abort uninstall | Returns a manual line; empty file removed |
+| R11 token-only agents without a log; key map | `TOKEN_ONLY`; the spec's map |
+| R12 synthetic Codex records; the `T0` window | `ck()` helper; `now` noted |
+| R13 the manual trust line | Returned by `install_user` |
+| R14 two vs three declared edits | Three |
+| R15 Codex-only home behavior | Task 6 |
+| R16 Claude helper log not an input | Task 9 test |
+| R17 Logbook README | Listed |
+| R18 fixture provenance | Copy from the container run; sha256 in the commit |
+| R19 `CODEX_SANDBOX_NETWORK_DISABLED` in `CLEARED` | Not taken: matters only inside a sandboxed Codex shell; stays within the spec's declared edit |
+| R20 viewer tag paths and sort | Task 9 browser test |
+| Spec–plan: Claude `env=None`; one module; extra print line | Task 13 amends §3; `codexconf.py` folded into `codex.py`; the extra line declared additive |
+| Cuts: stub registry; `codexconf.py`; Codex first prompt; new re-score procedure | All taken |
