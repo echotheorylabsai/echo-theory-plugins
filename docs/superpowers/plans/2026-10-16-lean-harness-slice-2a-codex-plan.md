@@ -21,7 +21,7 @@ regenerated in Task 3 with `tests/smoke/codex_facts.py`.
 **Execution:** one implementer in one session (tasks share `adapters/`, `doctor.py`, `start.py`), then the
 user's review protocol on the PR: an independent adversarial review (Fable, max effort) until APPROVE.
 
-**Revision:** r5 (2026-10-16): plan review rounds 1–3 applied (review log at the end).
+**Revision:** r6 (2026-10-16), **approved** (plan review round 4: APPROVE) with that round's recommended edits (review log at the end).
 
 ## Global constraints
 
@@ -245,7 +245,8 @@ def add_root(path: Path, root: str) -> str | None:
     before = _parse(text, path)                      # HarnessError when not valid TOML
     roots = before.get("sandbox_workspace_write", {}).get("writable_roots", [])
     lit = json.dumps(root, ensure_ascii=False)       # a TOML basic string for any path (no surrogate escapes)
-    if not isinstance(roots, list):                  # e.g. writable_roots = "x": never edit, never crash
+    if not isinstance(roots, list):                  # e.g. writable_roots = "x" (or a non-table section,
+                                                     # checked the same way): never edit, never crash
         raise HarnessError(f"{path}: writable_roots is not a list; add {lit} to it by hand")
     if root in roots:
         return None
@@ -269,8 +270,9 @@ insert `lit, ` after the `[` (TOML allows a trailing comma). Every other shape f
 the manual line. `remove_root` reverses: removes `BLOCK` verbatim if present and verified, else the
 `lit, `/`lit` text inside the array, verified the same way (`want` = before minus the root for element removal; for `BLOCK`
 removal, before without the whole `sandbox_workspace_write` table); a non-list
-`writable_roots` gets the manual line; when the remaining text is empty (install created the file), the
-file is removed. It never raises: a failed verification restores the
+`writable_roots` (or a non-table `sandbox_workspace_write`) gets the manual line; before writing it backs the
+file up with `claude._backup` and names the backup in its change line; when the remaining text is empty
+(install created the file), the file is removed. It never raises: a failed verification restores the
 file and returns the line "`config.toml`: remove <lit> from writable_roots by hand", so the uninstall's
 other change lines still print.
 
@@ -295,8 +297,10 @@ until you trust it again in `/hooks`"; remove the marked block and the blank lin
   empty array; `writable_roots = "x"` (manual line, no traceback); a root with non-ASCII characters; a `[profiles.x.sandbox_workspace_write]` decoy (must not be edited; verification passes
   only for the right table); an inline-table form → manual line, file restored.
 - [ ] Override file: `install_user` raises before writing anything under the Codex home.
-- [ ] Uninstall after a clean install restores all three files byte-for-byte (`hooks.json`/`AGENTS.md`/
-  `config.toml` absent before → absent after; present before → identical after); a user group added after install is listed as moved; a `config.toml` the
+- [ ] Uninstall after a clean install restores all three files (`hooks.json`/`AGENTS.md`/`config.toml`
+  absent before → absent after; present before → `hooks.json` equal as parsed JSON, the other two
+  byte-identical; an `AGENTS.md` without a final newline gets one before the blank line, and uninstall
+  removes exactly what install added); a user group added after install is listed as moved; a `config.toml` the
   remover cannot verify is restored and named in a manual line, and the other lines still return.
 - [ ] The manual trust line is returned on the first install only.
 - [ ] Symlinked `CODEX_HOME` works (writes through to the target directory, which is where Codex reads).
@@ -513,8 +517,10 @@ open the next session."
   else created.
 - [ ] A pre-start probe failing inside the new worktree (in its own `Sandbox()`, so the hook never reaches
   sibling tests): a `.git/hooks/post-checkout` in the main repo that writes `stray.txt` (git runs it on
-  `worktree add`), so `probe_clean` fails → worktree and branch removed, nothing in the spool. And the locked check failing: push `.harness/runs/<task-id>/state.json`
-  to the remote without fetching in the main checkout → same cleanup.
+  `worktree add`), so `probe_clean` fails → worktree and branch removed, nothing in the spool. And the locked check failing after the worktree exists (own `Sandbox()`): a
+  `post-checkout` hook that appends `{"v":1,"ts":"…","kind":"start","source":"cli","task_id":"<id>",
+  "branch":"<id>"}` to the spool (`spool.project_dir(env, common_dir) / "spool.jsonl"`), so git adds the
+  line during `worktree add`, after the pre-check and before the locked `probe_unused` → same cleanup.
 - [ ] In a linked worktree: behaves exactly as today (existing `test_start.py` untouched); `--agent` there
   refuses.
 - [ ] Doctor hint text in the main checkout; `tests/test_doctor.py`'s hint assertion edited to it.
@@ -568,6 +574,9 @@ in the test.
 - `event_msg` `token_count` with `info` present → `usage` = that `info.total_token_usage` (the last one),
   mapped `input_tokens`→`input`, `output_tokens`→`output`, `reasoning_output_tokens`→`thinking`,
   `cached_input_tokens`→`cache_read`, `cache_write_input_tokens`→`cache_write`.
+- A `response_item` of a type the reader does not know that carries a command-like key (`action`,
+  `command`, `cmd`, …; e.g. `local_shell_call`) → `skipped += 1`, so the log reads "partial", never clean
+  (Claude's rule for unknown shapes).
 - Tool calls outside `[since, until)` are not counted (Claude's rule); tokens, models and effort come from
   the whole log, as Claude's cost does; unparsable lines → `skipped`.
 
@@ -579,7 +588,8 @@ delegate sessions as today, plus Codex helper logs read from `agent_transcript_p
 `token_only` is token-only; `sessions`/`logs_total` count sessions whose agent has no token-only reader
 (Claude's; never helpers), missing logs by their session's agent. Record when any Claude log has a cost record or any token-only log was read; Claude-only results
 are unchanged plus `tokens_only: 0`; `usd`/`usd_exact` null when no cost record; token-only models listed
-with their output tokens and `usd: null`. `batch_summary`: `exact` skips null; `usd_runs` counts non-null.
+with their output tokens and `usd: null`. `batch_summary`: `exact` skips null; `usd_runs` counts non-null. The model sort key becomes
+`-(usd or 0)` (today's `-costUSD` would fail on a token-only model).
 
 **Viewer:** every print of a null `usd` on a task with `tokens_only > 0` says "tokens only" (the task's
 dollar tile, the project table's cost cell; the sort puts such tasks with the unpriced ones); the tile says
@@ -587,7 +597,7 @@ dollar tile, the project table's cost cell; the sort puts such tasks with the un
 both apply; the tokens caption ("N output · tokens only" for token-only tasks) prints whenever `cost` is
 present, outside the `if (md.length)` model-bar block; no bar for token-only models; the project tile says
 "N tasks with dollar totals"; `partialCost` unchanged (it reads `sessions`/`logs_total`). The page names no
-agent (`test_no_adapter_names_or_prefixes`).
+agent (`test_no_adapter_names_or_prefixes`), not even in a JS comment.
 
 **Tests first** (synthetic Codex records use a new `ck(sid, kind, t, log=None, parent=None, **f)` helper
 in the new tests, since `by()`/`hk()` hard-code Claude; calls are windowed from `T0`, so the fixture tests
@@ -628,7 +638,7 @@ pass `now = 60 * 86_400_000`, well past any capture date):
 **Files:** `tests/smoke/codex_facts.py` (the Phase 0b script, unchanged), `tests/smoke/run_smoke.py`
 (an opt-in `--agent codex` run), `tests/smoke/README` lines in `README.md`.
 
-- [ ] Add the script as sent to the Mac (sha256 `d1d5a7fb…`): run E has the shell run
+- [ ] Add the script (v2, sha256 `d1d5a7fb…`; the Mac ran v1, and runs v2 in Task 12): run E has the shell run
   `harness check C1 || true`, `gh pr merge 1 --squash || true` and an `apply_patch` adding
   `.harness/runs/x/note.md`, with `model_reasoning_effort="high"`; every run's session logs are copied,
   scrubbed (paths; `session_meta.base_instructions` dropped), to `<out>/logs/`.
@@ -670,8 +680,8 @@ and their fact tests.
   `logbook/tests/parity.py <projects…> --now-ms <fixed> --keep <dir>` once, to freeze a copy of the state
   dir; then for each checkout H (`main` at `88c0e8c`, and this branch) run parity's `SCORER` snippet with
   its output line changed to `out[name + "/" + c["task_id"]] = c` (whole cards), with the same `projects`
-  JSON parity builds (`root`, `name`, `project`, `ref`, from `build.load_projects`; the PR body carries the
-  exact command): `python3 -B -c "<snippet>" H <dir>/state <now_ms> '<projects json>' > cards-H.json`;
+  JSON parity builds, rebuilt with parity's own four lines (`build.load_projects` → `root`, `name`,
+  `project`, `ref`; `--keep` does not store it; the PR body carries the exact command): `python3 -B -c "<snippet>" H <dir>/state <now_ms> '<projects json>' > cards-H.json`;
   `diff` the two files. Identical (`as_of` included) or it is a bug.
 - [ ] On the Mac: run `codex_facts.py` (v2) once. Its fixtures' field lists equal the committed fixtures';
   replace `tests/fixtures/codex/logs/{e-0,c-0,c-1}.jsonl` with the Mac's (sha256 in the commit) and rerun
@@ -692,6 +702,9 @@ and their fact tests.
 `docs/superpowers/specs/2026-10-16-lean-harness-slice-2a-codex-spec.md` (the §3 row).
 
 - [ ] In the 2a spec's §5, "Prints the one manual step" adds "(when it added hook groups)" (plan round 3).
+- [ ] In the 2a spec's §15 step 2, add "after fetching the integration branch" (plan round 4, U4).
+- [ ] In the 2a spec's §9, after "Every other tool call counts as not inspected", add "and `write_stdin`
+  with text counts as a shell call the reader cannot inspect" (plan round 4, U5).
 - [ ] In the 2a spec's §3 table, the `claude.py` row adds "and an ignored `env=None` parameter on
   `install_user`/`uninstall_user`" (plan review round 1).
 - [ ] Apply every §14 row of the 2a spec exactly; re-read §4.3–4.4, §6.9, §7, §8, §11, §13–14, §16–17 for
@@ -767,3 +780,12 @@ and their fact tests.
 | §5 manual step "first install" | Task 13 amends §5 |
 | Optional: fetch before the checks | Taken |
 | Cut: two Mac fact runs | One |
+
+### Plan round 4 (r5 → r6): Fable (max effort) APPROVE
+
+Recommended edits applied: U1 the locked-check failure test injects a `start` line through a
+`post-checkout` hook (the pushed-folder version became vacuous once the fetch moved first); U2 unknown
+command-carrying record shapes make a Codex log "partial"; U3 `remove_root` backs up first; U4/U5 two
+one-phrase spec amendments in Task 13; polish: the model sort key, a non-table section, `hooks.json`
+compared as parsed JSON, the `AGENTS.md` final newline, no agent name in viewer comments, Task 10's script
+version, Task 12's projects JSON.
