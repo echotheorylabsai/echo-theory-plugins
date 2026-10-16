@@ -1,7 +1,8 @@
 # Lean Harness Slice 2a — Codex Agents — Product Spec
 
-Status: draft r3 for review 2026-10-16 (r2: Phase 0b container results; r3: review round 1 findings,
-the Mac results and task worktrees, D8; review log at the end) · owner: the user (sole developer).
+Status: draft r4 for review 2026-10-16 (r2: Phase 0b container results; r3: review round 1 findings,
+the Mac results and task worktrees, D8; r4: review round 2; review log at the end) · owner: the user
+(sole developer).
 Parent: [Lean Harness v0 product spec](./2026-10-08-lean-harness-v0-product-spec.md) (amended by H1–H12).
 This spec is the build contract for Slice 2a. Where it and the v0 spec differ, this spec wins; §14 lists
 every difference, applied to the v0 spec in the same PR that ships 2a. Anything not mentioned here follows
@@ -33,11 +34,12 @@ the task).
 | D5 | Codex-launched helpers | Detected automatically from the event log; an instruction rule is the fallback |
 | D6 | Proof | The full proof set in §11 |
 | D7 | Approach | One new adapter module plus small core changes (A). Rejected: a `harness codex` launcher (cannot wrap the desktop app; a new command to remember) and one shared config-driven adapter (rewrites Claude's working adapter) |
-| D8 | Task worktrees | `harness start --new`, run in the project's main checkout, creates the task's worktree at `<parent>/worktrees/<project>/<agent>/<task-id>`, where `<agent>` is the agent that started the task (§15) |
+| D8 | Task worktrees | `harness start --new`, run in the project's main checkout, creates the task's worktree at `<parent>/worktrees/<project>/<agent>/<task-id>`, where `<agent>` is the agent that started the task (§15). An agent may run it for the user, with the user's tier and request text verbatim |
 
-**Additive guarantee.** After 2a: the existing tests pass with no Claude test edited (shared test
-infrastructure gains one cleared variable, §12), and `harness score` over every task recorded before 2a
-produces the same scorecards (except `as_of`; §11).
+**Additive guarantee.** After 2a: no test of the Claude adapter, of recording or of scoring is edited;
+exactly two existing test lines change, both declared (§12: two cleared variables in `tests/helpers.py`,
+and the default-branch hint `tests/test_doctor.py` asserts, §15); and `harness score` over every task
+recorded before 2a produces the same scorecards (except `as_of`; §11).
 
 ---
 
@@ -90,11 +92,11 @@ logbook ──► READERS: claude → read_claude_log, codex → read_codex_log 
 | `harness/adapters/__init__.py` | Register `codex`; add `found(home)` per adapter. `identity_vars` and `foreign_vars` are unchanged in code, but their results now include `codex`, which activates v0 §6.9's cross-agent rows for the first time (§7) |
 | `harness/adapters/claude.py` | Add `found(home)` (§4) and `RUNNING_VAR = "CLAUDECODE"` (§15) only |
 | `install`, `uninstall`, `doctor`, `start` | Loop over found agents; an agent session's `harness start` probes only its own agent (§4) |
-| `harness/commands/start.py` | `start --new` on the default branch creates the task worktree; new optional `--agent` (§15) |
+| `harness/commands/start.py`, `harness/commands/doctor.py` | `start --new` in the main checkout creates the task worktree; new optional `--agent`; doctor's main-checkout hint names it (§15) |
 | `harness/context.py` | Event-log helper lookup when no parent marker is present (§7) |
 | `logbook/build.py`, `logbook/viewer.html` | `read_codex_log` and its `READERS` entry; token-only cost fields and label (§9) |
 | `hooks/bootstrap.md` | One sentence: start new tasks with `harness start --new` (§15) |
-| `tests/helpers.py` | `CODEX_HOME` added to the cleared variables (§12) |
+| `tests/helpers.py` | `CODEX_HOME` and `CLAUDECODE` added to the cleared variables (§12) |
 | `tests/fixtures/codex/` | **New.** Payloads captured in Phase 0b (§10) |
 | Unchanged | Phases and phase files, `AGENTS.md`, done gate, timing rules, event schema v1 (no new kinds, no new fields), every command and flag except `start --new --agent` |
 
@@ -134,7 +136,8 @@ so `start --new` fails with "run `harness install --user`". That is the intended
 | `$CODEX_HOME/config.toml` | The harness state root (`${XDG_STATE_HOME:-~/.local/state}/harness`, absolute) added to `[sandbox_workspace_write].writable_roots` | Back up first (same permission bits, as Claude's settings backup); edit only that key; re-parse with `tomllib` and confirm nothing else changed, else restore the backup and print the one line to add by hand |
 
 - **Refuses** if `$CODEX_HOME/AGENTS.override.md` exists (it replaces `AGENTS.md`, so the bootstrap would
-  never load). Claude's changes from the same run stand; remove the file and rerun (idempotent).
+  never load). Each adapter's changes are printed before the next adapter runs, so Claude's changes from
+  the same run are shown and stand; remove the file and rerun (idempotent).
 - **Prints the one manual step:** open Codex, run `/hooks`, and trust the harness hooks. The harness never
   writes trust entries itself.
 - **`uninstall --user`** removes only the harness hook groups, the marked block and the writable root
@@ -249,13 +252,16 @@ counted as for Claude), `apply_patch` (writes to harness-owned paths), `spawn_ag
 `turn_context`, `token_count` and `session_meta`. Every other tool call counts as not inspected (the
 Claude reader's existing rule). `cost` is null.
 
-**Cost and tokens.** `read_codex_log` fills `usage` and `models`. `cost_summary` returns a record whenever
-any log has a cost record or `usage`: `usd` null when no log has a cost record; per-model tokens for every
-model (`usd` null for token-only models); `sessions` and `logs_total` count only logs of agents whose logs
-carry dollars (Claude), so Codex sessions never make the total partial; `tokens_only` = the number of Codex
-logs read. The viewer prints "Claude sessions only" beside the dollar total when `tokens_only` > 0. A
-missing Claude cost record still marks the total partial. Claude-only tasks produce the same fields as
-today plus `tokens_only: 0`.
+**Cost and tokens.** `read_codex_log` fills `usage` (the log's cumulative tokens) and `models` (the log's
+last `turn_context.model`; a log's tokens are attributed to that model). `cost_summary` returns a record
+when any log has a cost record or any log was read by a token-only reader (Codex); a Claude log without a
+cost record changes nothing, as today. `sessions` and `logs_total` count Claude logs only, so Codex
+sessions never make the total partial; `tokens_only` = the number of Codex logs read; `usd` and
+`usd_exact` are null when no log has a cost record. `batch_summary` sums `usd_exact` over the tasks where
+it is not null, and `usd_runs` counts those tasks. The viewer lists token-only models with their output
+tokens and no dollars; the dollar tile prints "tokens only" when `usd` is null and "Claude sessions only"
+when `usd` is set and `tokens_only` > 0. A missing Claude cost record still marks the total partial.
+Claude-only tasks keep today's fields and values, plus `tokens_only: 0`.
 
 ---
 
@@ -276,7 +282,7 @@ Python 3.12.8, git 2.54.0 (2026-10-16, through a Remote Control session). All fo
 | 0b.3 | A `codex exec` launched from a Codex shell: its hook processes inherit the parent's `CODEX_THREAD_ID`; its payload `session_id` and its shell's `CODEX_THREAD_ID` are its own | ✅ | ✅ | §7 rule 1 |
 | 0b.4 | A built-in subagent: `SubagentStart`/`SubagentStop` carry the parent `session_id` and `agent_id` = the subagent's thread id; its shell's `CODEX_THREAD_ID` = that `agent_id`; it fires `UserPromptSubmit` with the parent `session_id` and its `agent_id`; `SubagentStart.transcript_path` is the subagent's own log | ✅ | ✅ | §6, §7 rule 2 |
 | 0b.5 | Hook processes never see their own session's `CODEX_THREAD_ID` (v0 §16 holds); shells see it | ✅ | ✅ | §7 |
-| 0b.6 | Trust: `[hooks.state."<key>"]` with `trusted_hash` (= `hooks/list` `currentHash`, `sha256:…`, not derivable from the entry) and `enabled`; the key's path is the absolute, symlink-resolved `hooks.json`; a bare `hooks.json:…` key is not honored; with valid entries, trusted hooks run under plain `codex exec` and untrusted ones are skipped silently; `[features].hooks` is stable and on by default | — | ✅ | §5, §8 |
+| 0b.6 | Trust: `[hooks.state."<key>"]` with `trusted_hash` (= `hooks/list` `currentHash`, `sha256:…`, not derivable from the entry) and `enabled`; the key's path is the absolute, symlink-resolved `hooks.json`; a bare `hooks.json:…` key is not honored; with valid entries, trusted hooks run under plain `codex exec` and untrusted ones are skipped silently; `[features].hooks` is stable and on by default | Key form ✅ (`hooks/list` `key_example` under `/private/var/…`); trusted-run: v0 §16 | ✅ | §5, §8 |
 | 0b.7 | `SessionEnd` hook timeout: default 1 s, clamped to at most 3 s; `timeout: 3` accepted without warning | ✅ | ✅ | §5, §13 |
 | 0b.8 | Session log: `session_meta`, `turn_context` (`model`, `effort`), `function_call` items (`exec_command` with `cmd`), cumulative `token_count`; no dollars | — | ✅ | §9 |
 | 0b.9 | Sandboxed shell: `CODEX_SANDBOX=seatbelt` on macOS (absent on Linux); hook `permission_mode` reads `bypassPermissions` under both modes in `exec`, so it is not a sandbox signal | ✅ | ✅ (Linux form) | §8 |
@@ -284,8 +290,8 @@ Python 3.12.8, git 2.54.0 (2026-10-16, through a Remote Control session). All fo
 **Left for P5 (the desktop app):** the app runs user-level hooks from `$CODEX_HOME/hooks.json` and sends
 `SessionEnd`; its shell has `CODEX_THREAD_ID` equal to the hook `session_id` and no `CODEX_SANDBOX` under
 full access; hooks trusted in the CLI also run in the app (or can be trusted there); `session_meta.originator`
-tells an app session from a CLI one. The first real `/hooks` trust on the Mac confirms 0b.6's key form
-there. If the app fails, it is listed as unsupported (D2); the session probe already stops it before triage.
+tells an app session from a CLI one. If the app fails, it is listed as unsupported (D2); the session probe
+already stops it before triage.
 
 ---
 
@@ -298,7 +304,7 @@ there. If the app fails, it is listed as unsupported (D2); the session probe alr
 | P3 | mvp: a Codex-led task that launches a `codex exec` helper | The helper is recorded as a delegate; the controller never changes; a `harness phase` from it, if it runs one, refuses |
 | P4 | echo-wiki: one Codex-led task | Merged; scorecard complete |
 | P5 | At least one Codex session in P1–P4 runs in the desktop app | The §10 "Left for P5" facts hold; recorded like a CLI session |
-| P6 | Every proof task registered with `start --new` from the main checkout | Each worktree at `worktrees/<project>/<agent>/<task-id>` (§15) |
+| P6 | Every proof task registered with `start --new` from the main checkout: at least one from a Claude session, one from a Codex session (detection) and one from your terminal with `--agent` | Each worktree at `worktrees/<project>/<agent>/<task-id>` on branch `<task-id>`; each `start` event carries the task's agent and no session; the main checkout unchanged (§15) |
 | All | — | Logbook pages build for every proof task (the build's clock and agent-time parity check passes); Codex tokens shown, dollars labeled "Claude sessions only" where Codex ran |
 | Regression | Every task recorded before 2a | `harness score` cards identical except `as_of` (in-flight tasks compared from scores run back to back); existing suite green with no Claude test edited |
 
@@ -306,9 +312,12 @@ there. If the app fails, it is listed as unsupported (D2); the session probe alr
 
 ## 12. Testing
 
-- **Isolation:** tests never see the real `$CODEX_HOME`: `clean_env` clears it (`tests/helpers.py`
-  `CLEARED`); a test that needs Codex creates `<temp HOME>/.codex` and sets `CODEX_HOME` itself. The smoke
-  sets `CODEX_HOME=<temp>/.codex` explicitly.
+- **Isolation:** tests never see the real `$CODEX_HOME` or the running agent: `clean_env` clears
+  `CODEX_HOME` and `CLAUDECODE` (`tests/helpers.py` `CLEARED`; the suite is often run from inside Claude
+  Code, whose shells set `CLAUDECODE=1`); a test that needs Codex creates `<temp HOME>/.codex` and sets
+  `CODEX_HOME` itself. The smoke sets `CODEX_HOME=<temp>/.codex` explicitly.
+- **Declared edits to existing tests:** those two cleared variables, and `tests/test_doctor.py`'s
+  assertion of the main-checkout hint (§15). Nothing else.
 - **Unit:** Codex `to_event` from fixtures (including the `SubagentStart` path swap and dropped helper
   events); parent rule (§7) for each launch row; event-log helper lookup (both rules, plus a session with no
   hook events); found-agent selection for each command in §4; `--agent` resolution (§15).
@@ -321,13 +330,17 @@ there. If the app fails, it is listed as unsupported (D2); the session probe alr
   written; the `config.toml` edit changes only `writable_roots`; override file refuses; uninstall lists
   shifted user hooks and restores files to their pre-install content when nothing else changed; the trust
   probe accepts a resolved-path key (symlinked home) and rejects a bare one.
-- **Worktrees (temp repo with a bare remote):** `start --new` on the default branch creates
-  `worktrees/<project>/<agent>/<task-id>` on branch `<slug>` and registers inside it; `--agent` and marker
-  resolution; refusal on an existing path, branch or task id leaves nothing behind; a failure after the
-  worktree exists removes it and its branch; `start --new` in an existing worktree behaves as today.
-- **Logbook:** `read_codex_log` against a recorded Codex log; a Codex-only task shows tokens and no
-  dollars; a mixed task with every Claude log read is not partial; a Claude-only task's cost fields are
-  unchanged.
+- **Worktrees (temp repo with a bare remote):** `start --new` in the main checkout (whatever branch it has
+  checked out) creates `worktrees/<project>/<agent>/<task-id>` on branch `<task-id>` and registers inside
+  it; the main checkout's branch and `git status` are unchanged; the `start` event has the task's agent,
+  null `session_id` and `parent_session`, and the worktree's `branch` and `cwd`; agent resolution
+  (`--agent`, one `RUNNING_VAR`, the one found agent, refusal); a used task id refuses before anything is
+  created; a failure after the worktree exists removes it (`--force`) and its branch; `start --new` in a
+  linked worktree behaves as today; the main-checkout doctor hint.
+- **Logbook:** `read_codex_log` against a recorded Codex log; a Codex-only task shows tokens and "tokens
+  only"; a mixed task with every Claude log read is not partial and says "Claude sessions only"; a
+  Claude-only task's cost fields and values are unchanged (an open session without a cost record still
+  yields none); a project with one Codex-only task builds (`batch_summary`).
 - **Regression:** the existing suite; re-score of a copy of the real state dir, diffed (except `as_of`).
 - **Smoke:** `tests/smoke/codex_facts.py` (the Phase 0b script) and the real-agent smoke extended with a
   scripted `codex exec` task in a throwaway `CODEX_HOME` with `auth.json` copied in and
@@ -344,7 +357,8 @@ there. If the app fails, it is listed as unsupported (D2); the session probe alr
 | Uninstall can move the user's own hooks | It lists them so the user re-trusts them |
 | A Codex helper not recognized (a later Codex version breaks rule 1 before the fallback ships) | It looks like a main session. Sandboxed, `codex_full_access` fails and it cannot take control; with full access it can pass `harness start` and become controller. The Logbook shows the controller change; the scorecard's timing follows the recorded controller |
 | A Codex session started from a shell that inherited an unrelated session's `CODEX_THREAD_ID` | Rule 1 makes it a delegate of that session; `harness start` names the parent, so the user relaunches from a clean shell |
-| Cross-agent chains three deep (Codex → Claude → Codex, Claude → Codex → Claude) refuse as ambiguous | Pre-existing v0 limit (identity resolution sees two identities that differ from the parent); unchanged in 2a; transcripts hold the chain |
+| Cross-agent chains three deep (Codex → Claude → Codex, Claude → Codex → Claude): the innermost session's commands refuse as ambiguous; its hook events record the top session as parent | Pre-existing v0 limit (identity resolution sees two identities that differ from the parent); unchanged in 2a; transcripts hold the chain |
+| Time from registration to the first `harness start` in the new worktree, and any project setup done there (say mvp's dependency install), is charged | As the pre-push hook is (v0 §4.6): register only when the agent is about to open; `start --new` says so when it prints the path |
 | D3 blocks every `start --new` until a newly found agent is installed and trusted | Loud by design; the fix is printed |
 | Codex dollars unknown | Tokens recorded; dollar totals labeled Claude-only (D4) |
 | Each `codex exec` adds a trust entry per worktree to `config.toml` | Codex's own behavior; harmless (v0 §16) |
@@ -358,13 +372,13 @@ there. If the app fails, it is listed as unsupported (D2); the session probe alr
 | Header | Add: "Slice 2 split 2026-10-16: 2a Codex agents (this repo's `2026-10-16-lean-harness-slice-2a-codex-spec.md`); 2b the rest" |
 | 4.1 | `~/.codex/hooks.json` line: "6 hook groups (you trust them once with `/hooks`)"; the user-scope files are written only for agents found on the machine; add the `worktrees/<project>/<agent>/<task-id>` location |
 | 4.3 | `install --user`: acts on found agents (§4 here); trust keys are `<resolved hooks.json path>:<event_snake_case>:<group>:<handler>` (replaces `hooks.json:stop:0:0`); the `config.toml` edit's backup and re-parse rule; uninstall's shifted-hooks list |
-| 4.4 | Start flow: step 1 becomes `harness start --new` in the main checkout, which creates the worktree (§15 here); the in-place flow stays |
+| 4.4 | Start flow: steps 1–2 become one `harness start --new` in the main checkout, which creates the worktree (§15 here); the in-place flow in a linked worktree stays; the bootstrap gains §15's sentence |
 | 6.9 | Add the event-log helper rules (§7 here) after "Delegates"; the delegate notice names the parent |
-| 7 | `start --new`: `[--agent NAME]`, creates the worktree on the default branch |
+| 7 | `start --new`: `[--agent NAME]`, creates the worktree when run in the main checkout; "Run by: you, or a session you ask to, with your tier and your text" |
 | 8 | Install probes: per found agent; `harness start` in a session probes its own agent; Codex probe names as in §8 here |
 | 11 | Slice 2 row split into 2a (this spec) and 2b (§2.2 here) with their exit criteria |
 | 13 | Close the Codex rows with Phase 0b results |
-| 14 | Add the §13 rows here; correct "nested delegation … records the top session as parent" to the ambiguity refusal |
+| 14 | Add the §13 rows here; the "nested delegation … records the top session as parent" row adds: "commands of the innermost session refuse as ambiguous" |
 | 16 | Add a "Phase 0b" paragraph: §10 here |
 | 17 | Daily use steps 1–3: one `harness start --new` in the main checkout, then open the agent in the printed worktree |
 
@@ -389,33 +403,45 @@ clean up, and the parent folder holds only project checkouts.
   name), so they are the same from any worktree of the project.
 - `<agent>` is the agent that started the task. A new adapter (say Cursor) gets its own folder with no
   other change.
-- The branch is `<slug>`.
+- The branch is `<task-id>`, so folder, branch and task id are one name, `git worktree list` describes
+  itself, and a slug can be reused on another day.
 
-**`harness start --new` on the default branch creates the worktree.** Run in the main checkout (where the
-default branch is checked out):
+**`harness start --new` in the main checkout creates the worktree.** The main checkout is the one whose
+git dir equals the git common dir, whatever branch it has checked out. There:
 
 1. **Agent:** `--agent NAME` if given (an adapter name); else the one adapter whose `RUNNING_VAR` is set in
-   the environment (Claude Code sets `CLAUDECODE=1` in its shells; Codex sets `CODEX_THREAD_ID`); none or
-   several → refuse: "pass --agent claude|codex".
-2. **Before creating anything:** install probes (every found agent), the not-cloud probe, and refuse if the
-   path, the local or remote branch, or the task id already exists.
+   the environment (Claude Code sets `CLAUDECODE=1` in its shells; Codex sets `CODEX_THREAD_ID`); else the
+   one found agent (§4); none or several → refuse: "pass --agent claude|codex".
+2. **Before creating anything:** install probes (every found agent), the not-cloud probe, and the task id
+   never used (the existing check). An existing path or branch is refused by git itself; the refusal
+   prints `git worktree remove --force <path>` and `git branch -D <task-id>`, which clear what an
+   interrupted run leaves.
 3. `git fetch` the integration branch; `git worktree add <parent>/worktrees/<project>/<agent>/<task-id>
-   -b <slug> <remote>/<default>`.
-4. Register inside the new worktree exactly as today (pre-start probes there, the locked uniqueness check,
-   task folder, `start` event). The `start` event's `cwd` is the worktree path, so the record carries the
-   agent folder; no new event field.
-5. Any failure after step 3 removes the worktree and the branch it created: nothing registered, nothing
-   left behind.
-6. Print the task id, the worktree path and "open <agent> in that folder".
+   -b <task-id> <remote>/<default>`.
+4. Register inside the new worktree as today (pre-start probes there, the locked uniqueness check — the
+   authority —, task folder, `start` event), except that the `start` event carries no session identity
+   (`session_id` and `parent_session` null) and `agent` = the task's agent from step 1: the existing
+   common field, no new field.
+5. Any failure after step 3 removes what this run created (`git worktree remove --force`, then
+   `git branch -D`): nothing registered, nothing left behind.
+6. Print: "task <id> registered in <path>; the clock is running: open <agent> there now. This session does
+   not work on the task."
 
-**Today's flow stays.** On any other branch (a worktree you made yourself), `start --new` registers in
-place exactly as today. Tasks in flight are untouched; moving an old worktree is optional
-(`git worktree move`).
+**The registering session never works on the task.** Hooks link a session to a task by the folder it
+started in, so the first task session is opened in the new worktree; a session that registered from the
+main checkout and `cd`s there would be recorded on the wrong branch.
+
+**Today's flow stays.** In a linked worktree you made yourself, `start --new` registers in place exactly as
+today. Tasks in flight are untouched; moving an old worktree is optional (`git worktree move`).
+`harness doctor` in the main checkout says "`harness start --new` here creates the task's worktree; these
+checks apply there" instead of today's `git worktree add` hint.
 
 **Agents learn it from the bootstrap.** `hooks/bootstrap.md` gains one sentence: "To start a new harness
-task, run `harness start --new` in the project's main checkout; it creates the task's worktree." This
-changes the installed bootstrap for both agents, so `harness install --user` reruns after the update (it
-must anyway, for Codex).
+task for the user, run `harness start --new` in the project's main checkout with the user's tier and the
+user's request text verbatim, saved outside any checkout; it creates the task's worktree and says where to
+open the next session." The tier is the user's benchmark grouping and `request.md` the verbatim request
+(v0 §3, §2.3), so an agent never sizes or rewrites either. This changes the installed bootstrap for both
+agents, so `harness install --user` reruns after the update (it must anyway, for Codex).
 
 **Not covered.** Worktrees an agent app makes on its own (Codex `--worktree`, Claude Code's own isolation)
 are not harness tasks (v0 §4.4) and stay where the app puts them. Cleanup is unchanged (the README's
@@ -456,3 +482,22 @@ the v0 roadmap. A Codex transcript reader for scoring (2b's cache) reuses `read_
 | Cut: `parent_thread_id` cross-check | Cut (§9) |
 | Bound: `read_codex_log` parity | Bounded to the listed items (§9) |
 | Optional: env-only rule 2 | Not taken: one mechanism (the event log) for both rules |
+
+### Round 2 (r3 → r4): Fable (max effort) REVISE
+
+| Finding | Resolution |
+|---|---|
+| F4 incomplete: null `usd` breaks `batch_summary`; viewer hides token-only models; open Claude sessions would gain a record; per-model Codex tokens not derivable | §9 rewritten with the reviewer's rule (token-only reader triggers the record; `usd_runs`; viewer labels; tokens per log on its last model); §12 build test |
+| F5 Mac key form understated | §10 0b.6 Mac column; P5 sentence removed |
+| F12 over-corrected | §13 and §14 rows: commands refuse, hooks record the top session |
+| F17 output order | §5: each adapter's changes printed before the next runs |
+| N1 registering session leaks into the record | §15 step 4: `start` carries no session, `agent` = the task's agent; step 6 text; "never works on the task" rule; §12, P6 |
+| N2 `start --new` by agents vs the user's tier and verbatim request | Agents may run it for the user, with the user's tier and verbatim text (D8 row, bootstrap sentence, §14 v0 §7 row) |
+| N3 clock starts at registration | §13 row; step 6 text; no pause rule |
+| N4 trigger | Main checkout (git dir = common dir), any branch |
+| N5 cleanup | `--force` removal, `branch -D`, printed recovery commands |
+| N6 single-use slugs | Branch = `<task-id>` |
+| N7 `--agent` always needed from a terminal | Fallback to the one found agent; P6 covers all three paths |
+| N8 doctor hint | §15 hint; declared test edit (§1, §12) |
+| Own catch: tests inherit `CLAUDECODE=1` from Claude Code | `CLAUDECODE` cleared too (§3, §12) |
+| Cut: step 2's duplicate checks | Step 2 keeps the not-cloud probe and the task-id check; git and the locked check do the rest |
