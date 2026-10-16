@@ -1,8 +1,8 @@
 # Lean Harness Slice 2a — Codex Agents — Product Spec
 
-Status: draft r6 for review 2026-10-16 (r2: Phase 0b container results; r3: review round 1 findings,
-the Mac results and task worktrees, D8; r4–r6: review rounds 2–4; review log at the end) · owner: the
-user (sole developer).
+Status: approved 2026-10-16 (independent review, Fable max effort, round 5: APPROVE), r7 with that
+round's recommended edits (r2: Phase 0b container results; r3: review round 1, the Mac results and task
+worktrees, D8; r4–r7: review rounds 2–5; review log at the end) · owner: the user (sole developer).
 Parent: [Lean Harness v0 product spec](./2026-10-08-lean-harness-v0-product-spec.md) (amended by H1–H12).
 This spec is the build contract for Slice 2a. Where it and the v0 spec differ, this spec wins; §14 lists
 every difference, applied to the v0 spec in the same PR that ships 2a. Anything not mentioned here follows
@@ -96,7 +96,7 @@ logbook ──► READERS: claude → read_claude_log, codex → read_codex_log 
 | `harness/commands/start.py`, `harness/commands/doctor.py` | `start --new` in the main checkout creates the task worktree; new optional `--agent`; doctor's main-checkout hint names it (§15) |
 | `harness/context.py` | Event-log helper lookup when no parent marker is present (§7) |
 | `logbook/build.py`, `logbook/viewer.html` | `read_codex_log` and its `READERS` entry; token-only cost fields and label (§9) |
-| `hooks/bootstrap.md` | One sentence: start new tasks with `harness start --new` (§15) |
+| `hooks/bootstrap.md` | Two edits: a sentence on starting tasks with `harness start --new`, and "ignore these instructions" (§15) |
 | `tests/helpers.py` | `CODEX_HOME` and `CLAUDECODE` added to the cleared variables (§12) |
 | `tests/fixtures/codex/` | **New.** Payloads captured in Phase 0b (§10) |
 | Unchanged | Phases and phase files, `AGENTS.md`, done gate, timing rules, event schema v1 (no new kinds, no new fields), every command and flag except `start --new --agent` |
@@ -143,7 +143,8 @@ so `start --new` fails with "run `harness install --user`". That is the intended
   writes trust entries itself.
 - **`uninstall --user`** removes only the harness hook groups, the marked block and the writable root
   (backup first). If any of the user's hook groups sit after a harness group in the same event, it lists
-  them: their position changes, so Codex will ask to trust them again. Trust entries Codex stored for the
+  them: their position changes, so Codex skips them until you trust them again in `/hooks` (the listing
+is the only notice). Trust entries Codex stored for the
   removed hooks are left alone (they match nothing once the hooks are gone).
 - Hooks are written to `hooks.json` only; hooks the user keeps inline in `config.toml` are not touched.
 
@@ -160,7 +161,7 @@ recorded when present and never reported missing.
 | `SessionStart` | `session_start` | `session_id`, `source` | `trigger` = `source` |
 | `UserPromptSubmit` | `prompt` | `session_id`, `turn_id` | `turn_id` |
 | `Stop` | `stop` | `session_id`, `turn_id` | `turn_id` |
-| `SubagentStart` | `subagent_start` | `session_id`, `agent_id`, `agent_type` | `agent_id`, `agent_type`; the payload's `transcript_path` is recorded as `agent_transcript_path` and `transcript_path` is null (Codex puts the helper's own log there) |
+| `SubagentStart` | `subagent_start` | `session_id`, `agent_id`, `agent_type` | `agent_id`, `agent_type`; the payload's `transcript_path` is recorded as `agent_transcript_path` and `transcript_path` is null (Codex puts the helper's own log there; so coverage's null `transcript_path` count rises by one per Codex helper, honestly) |
 | `SubagentStop` | `subagent_stop` | `session_id`, `agent_id`, `agent_type` | `agent_id`, `agent_type`, `agent_transcript_path` |
 | `SessionEnd` | `session_end` | `session_id`, `reason` | `reason` |
 
@@ -232,7 +233,7 @@ plus one Codex-only line — "To launch another agent process for part of a harn
 | `codex_writable_root` | The state root is in `[sandbox_workspace_write].writable_roots` | `harness install --user` |
 | `codex_bootstrap` | The marked block is present and equals `hooks/bootstrap.md` | `harness install --user` |
 | `codex_no_override` | No `$CODEX_HOME/AGENTS.override.md` | Remove or rename it |
-| `codex_full_access` | Passes unless the command's identity is Codex and `CODEX_SANDBOX` is set (always passes in `start --new` and `doctor` without a Codex identity) | Relaunch Codex with full access (`-s danger-full-access`, or the app's full-access setting) |
+| `codex_full_access` | Passes unless the command's identity is Codex and `CODEX_SANDBOX` or `CODEX_SANDBOX_NETWORK_DISABLED` is set (macOS sets both; Linux only the second) (always passes in `start --new` and `doctor` without a Codex identity) | Relaunch Codex with full access (`-s danger-full-access`, or the app's full-access setting) |
 
 The shared session probe (this session's hook events reached the spool in the last 10 minutes) applies to
 Codex unchanged. Codex main sessions run with full access (v0 C6, unchanged); sandboxed Codex helpers
@@ -253,11 +254,15 @@ record through the writable root.
 **`read_codex_log`** returns the same keys as `read_claude_log` and parses only: shell calls (through the
 existing command inspector, so `harness` commands, their outcomes and GitHub writes are counted as for
 Claude) in both recorded shapes — `exec_command` with a `cmd` string, and `shell` with a `command` argv
-list (joined); `apply_patch` (writes to harness-owned paths), as a custom tool call or as a shell argv whose
-first word is `apply_patch`; `spawn_agent` (helper launches); `turn_context`, `token_count` and
+list (joined with `shlex.join`); `apply_patch` (writes to harness-owned paths: its `*** Add/Update/Delete
+File:` paths are checked against the harness-owned paths), as an `exec_command` whose `cmd` starts with
+`apply_patch` (the recorded 0.163 shape: Codex intercepts it and answers `Exit code: N`), a shell argv
+whose first word is `apply_patch`, or a custom tool call; `spawn_agent` (helper launches); `turn_context`, `token_count` and
 `session_meta`. Every other tool call counts as not inspected (the Claude reader's existing rule). A
-command's outcome comes from its `function_call_output` text ("Process exited with code N": 0 done, else
-failed); a call without one is `no_result`. `cost` is null. Its fixtures are session logs captured by
+command's outcome comes from its `function_call_output` text ("Process exited with code N", or "Exit code:
+N" for an intercepted `apply_patch`: 0 done, else failed); a call without one is `no_result`. The reader
+also returns `effort` (the last `turn_context.effort`), which the Logbook shows when the records carry
+none. `cost` is null. Its fixtures are session logs captured by
 `codex_facts.py` on the Mac (0.160), the platform that matters: the script copies every log it produced
 (main, nested child, subagent) into `<out>/logs/`, scrubbed like the payloads (paths;
 `session_meta.base_instructions` dropped), and the Mac run is repeated once for them. A shape the Mac logs
@@ -271,16 +276,17 @@ last `turn_context.model`; a log's tokens are attributed to that model), and set
 are every session, as today, plus the helper logs of non-Claude sessions only (Claude helpers stay inside
 their session's cost record, as today). It returns a record when any log has a cost record or any
 token-only log was read; a Claude log without a cost record changes nothing, as today. `sessions` and
-`logs_total` count Claude sessions (never helpers), a missing Claude log still counting in `logs_total` as
-today, so Codex sessions never make the total partial; `tokens_only` = the number of token-only logs read,
+`logs_total` count sessions whose agent has no token-only reader (Claude sessions; never helpers), a
+missing Claude log still counting in `logs_total` as today, so Codex sessions never make the total partial; `tokens_only` = the number of token-only logs read,
 Codex helper logs included (a Codex helper's own log, from `agent_transcript_path`, adds its tokens); `usd`
 and `usd_exact` are null when no log has a cost record.
 `batch_summary` sums `usd_exact` over the tasks where it is not null, and `usd_runs` counts those tasks.
-The viewer keeps the per-model data and adds no bar for token-only models: the tokens caption reads
-"N output · tokens only". Every print of a null `usd` on a task with `tokens_only` > 0 says "tokens only"
+The viewer keeps the per-model data and adds no bar for token-only models: the tokens caption, printed
+whenever `cost` is present (outside the model-bar block), reads "N output · tokens only". Every print of a null `usd` on a task with `tokens_only` > 0 says "tokens only"
 (the task's dollar tile, the project table's cost cell; its sort puts such tasks with the unpriced ones);
 the dollar tile prints "excludes N token-only sessions" (N = `tokens_only`) when `usd` is set and
-`tokens_only` > 0; the project tile says "N tasks with dollar totals". The page never names an agent (the Logbook's rule,
+`tokens_only` > 0; when a task is also partial, the partial caption wins (the stronger warning); the
+project tile says "N tasks with dollar totals". The page never names an agent (the Logbook's rule,
 pinned by `tests/test_logbook.py` `test_no_adapter_names_or_prefixes`). A missing Claude cost record
 still marks the total partial. Claude-only tasks keep today's fields and values, plus `tokens_only: 0`.
 
@@ -369,7 +375,7 @@ fails, it is listed as unsupported (D2); the session probe already stops it befo
 - **Regression:** the existing suite; `score.collect` at one fixed `now_ms`, pre-2a vs 2a, over a copy of
   the real state dir: identical cards.
 - **Smoke:** `tests/smoke/codex_facts.py` (the Phase 0b script) and the real-agent smoke extended with a
-  scripted `codex exec` task in a throwaway `CODEX_HOME` with `auth.json` copied in and
+  scripted `codex exec` task in a throwaway `CODEX_HOME` with `auth.json` copied in (deleted in a `finally`) and
   `--dangerously-bypass-hook-trust` (`< /dev/null`).
 
 ---
@@ -386,6 +392,7 @@ fails, it is listed as unsupported (D2); the session probe already stops it befo
 | Cross-agent chains three deep (Codex → Claude → Codex, Claude → Codex → Claude): the innermost session's commands refuse as ambiguous; its hook events record the top session as parent | Pre-existing v0 limit (identity resolution sees two identities that differ from the parent); unchanged in 2a; transcripts hold the chain |
 | Time from registration to the first `harness start` in the new worktree, and any project setup done there (say mvp's dependency install), is charged | As the pre-push hook is (v0 §4.6): register only when the agent is about to open; `start --new` says so when it prints the path |
 | D3 blocks every `start --new` until a newly found agent is installed and trusted | Loud by design; the fix is printed |
+| Agent sessions that register from the main checkout leave their hook events on the default branch | Counted as events tied to no task on the Logbook's project page; not an error; scorecards unaffected |
 | A Codex built-in subagent that runs `harness check` appears twice in the Logbook: as a helper span and as a delegate session of the main session | Cosmetic; both are correct records of one helper |
 | A Codex session that registers in the main checkout and then works in the worktree (against §15's rule) is recorded on the default branch | Its hook events are orphans and its end never pauses the clock; the scorecard shows both. Not enforced in 2a (Claude cannot do it: no markers in the main checkout, so `session_live` fails) |
 | Codex dollars unknown | Tokens recorded; dollar totals labeled Claude-only (D4) |
@@ -473,9 +480,10 @@ keyed on the main checkout). `probe_task_branch`'s fix text becomes "run `harnes
 checkout" (no test pins it).
 
 **Agents learn it from the bootstrap.** `hooks/bootstrap.md` gains one sentence: "To start a new harness
-task for the user, run `harness start --new` in the project's main checkout with the user's tier and the
-user's request text verbatim, saved outside any checkout; it creates the task's worktree and says where to
-open the next session." The tier is the user's benchmark grouping and `request.md` the verbatim request
+task for the user, run `harness start --new` in the project's main checkout with the user's tier (ask if
+they gave none) and the user's request text verbatim, saved outside any checkout; it creates the task's
+worktree and says where to open the next session." Docs keep `<agent>` as a placeholder in path examples
+(the Logbook Guide and page name no agent). The tier is the user's benchmark grouping and `request.md` the verbatim request
 (v0 §3, §2.3), so an agent never sizes or rewrites either. Its first sentence's "ignore this file" becomes
 "ignore these instructions" (the Codex block sits inside the user's whole `AGENTS.md`). This changes the
 installed bootstrap for both agents, so `harness install --user` reruns after the update (it must anyway,
@@ -574,3 +582,12 @@ the v0 roadmap. A Codex transcript reader for scoring (2b's cache) reuses `read_
 | Cut: token-only model bars | Cut: caption only |
 | Cut: "Claude is always found" | Not taken: D3 (the user's choice) installs only agents found on the machine; the rule is one line |
 | Decision challenge: drop `<agent>` from the path | Not taken: showing which agent started a task is the user's stated requirement for D8; every session's agent stays in the records |
+
+### Round 5 (r6 → r7): Fable (max effort) APPROVE
+
+Recommended edits applied: P2 completion (`shlex.join`; `apply_patch` through `exec_command`, with its
+`Exit code: N`), Q1 tokens caption always printed, Q2 the reader returns `effort`, Q3 uninstall wording,
+Q4 registering sessions' events disclosed (§13), Q5 the bootstrap asks for a missing tier and docs keep
+`<agent>` as a placeholder; optional Q6–Q11 applied (one line each). Not taken: dropping `RUNNING_VAR`
+detection (it makes the agent folder right without the agent naming itself) and dropping the automatic
+`config.toml` edit (v0 C6: install adds the writable root).
