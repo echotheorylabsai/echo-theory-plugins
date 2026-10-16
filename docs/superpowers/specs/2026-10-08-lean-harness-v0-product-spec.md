@@ -1,6 +1,8 @@
 # Lean Harness v0 — Product Spec
 
 Status: approved 2026-10-08 (Fable review: APPROVE); amended 2026-10-09 by the v0 hardening plan (H1–H12 in §2.2) · owner: the user (sole developer).
+Slice 2 split 2026-10-16: 2a Codex agents ([`2026-10-16-lean-harness-slice-2a-codex-spec.md`](./2026-10-16-lean-harness-slice-2a-codex-spec.md), "2a" below; its §14 changes are applied
+here); 2b the rest.
 Parent design (approved): [`docs/lean-coding-harness-v0-design.md`](../../lean-coding-harness-v0-design.md),
 also the Claude Doc at https://claude.ai/code/artifact/641331bd-9fc6-4211-8045-9f1c4ee6a467.
 This spec is the build contract for v0. Where it and the parent differ, this spec wins, and every
@@ -29,7 +31,7 @@ planned but deferred like harness comparisons".
 | R3 | Before triage starts, a pre-start validation confirms compatibility and prerequisites | §8 |
 | R4 | Work delegated to an agent of another type links to the task; all data from every agent involved belongs to the task | §5.4, §6.8–6.9 |
 | R5 | A task spans many sessions (stops for approval, escalation, blockers); all group under one task; a task is complete only when all its work is complete | §3, §6.10 |
-| R6 | Ready for real work across multiple projects with both agents concurrently, with all data needed for later analysis and benchmarking recorded | §6.12, §11 (Slice 2) |
+| R6 | Ready for real work across multiple projects with both agents concurrently, with all data needed for later analysis and benchmarking recorded | §6.12, §11 (Slices 2a and 2b) |
 | R7 | Evolves to v1 (harness comparisons) and later versions without rework | §15 |
 
 **Principles the user set:** keep it simple, optimal and flexible (YAGNI); the harness owns the
@@ -126,12 +128,12 @@ clean up (§4.6).
 ### 4.1 Locations
 
 ```
-~ (user scope, installed once by `harness install --user`)
+~ (user scope, installed once by `harness install --user`, for the agents found on the machine: 2a §4)
 ├─ ~/.local/bin/harness                 dispatcher → python3 <harness repo>/harness/cli.py
 ├─ ~/.claude/CLAUDE.md                  imports the bootstrap (user-scope copy)
 ├─ ~/.claude/settings.json              6 hook entries + allow rule Bash(harness:*)
 ├─ ~/.codex/AGENTS.md                   bootstrap appended (marked block)
-├─ ~/.codex/hooks.json                  6 hook entries (you approve them once in Codex)
+├─ ~/.codex/hooks.json                  6 hook groups (you trust them once with /hooks)
 └─ ~/.codex/config.toml                 state dir added to [sandbox_workspace_write].writable_roots
 
 ~/Desktop/src/echo-official/lean-harness/     harness repo: CODE ONLY (private, GitHub org echotheorylabsai)
@@ -142,6 +144,9 @@ clean up (§4.6).
    ├─ project.json
    ├─ memory/MEMORY.md, memory/<area>.md
    └─ runs/<task-id>/                   one folder per task (§6.1)
+
+<parent>/worktrees/<project>/<agent>/<task-id>/   task worktrees `harness start --new` creates from the main
+                                        checkout (2a §15); <parent> holds the main checkout; branch <task-id>
 
 ${XDG_STATE_HOME:-~/.local/state}/harness/<project-hash>/   per machine, never in git (§6.6)
 ```
@@ -167,32 +172,42 @@ one spool and different projects never mix.
 
 | Command | Writes | Notes |
 |---|---|---|
-| `harness install --user` | Everything under "user scope" in §4.1 | Idempotent; adds only its own entries (hook entries that call `harness hook`, the allow rule, the writable root, a delimited bootstrap block) and prints each change it made. It appends hook entries after existing ones and never reorders them: Codex keys approvals by file and position (`hooks.json:stop:0:0`), so a reorder would silently un-approve your existing hooks. Prints the one manual step: open Codex once and approve the harness hooks (Codex skips unapproved non-managed hooks and stores approvals in `~/.codex/config.toml` under `hooks.state`; the harness never writes approvals itself). Fails loudly if `$CODEX_HOME/AGENTS.override.md` exists |
+| `harness install --user` | Everything under "user scope" in §4.1, for each agent found on the machine (2a §4: `~/.claude`, `$CODEX_HOME`; Claude when neither exists) | Idempotent; adds only its own entries (hook entries that call `harness hook`, the allow rule, the writable root, a delimited bootstrap block) and prints each change it made. It appends hook groups after existing ones and never reorders them: Codex keys trust by position (`<resolved hooks.json path>:<event_snake_case>:<group>:<handler>`), so a reorder would silently un-trust your existing hooks. It backs up `config.toml` before adding the writable root and re-parses it; if anything else changed it restores the backup and prints the line to add by hand. When it added hook groups it prints the one manual step: open Codex, run `/hooks` and trust the harness hooks (Codex skips untrusted non-managed hooks and stores trust in `config.toml` under `hooks.state`; the harness never writes trust itself). Fails loudly if `$CODEX_HOME/AGENTS.override.md` exists. `uninstall --user` lists your hook groups whose position its removal changed, so you trust them again |
 | `harness install` (in a project) | `.harness/project.json` (resolved integration remote and default branch, defaults from §6.2) and the `.gitattributes` line, on a branch | You open, review and merge that PR before the first task |
 
 ### 4.4 Start flow
 
 ```
-You, in a terminal:
-  1. git fetch origin
-     git worktree add <path> -b <branch> origin/main
-  2. cd <path>
-     harness start --new <slug> --benchmark-tier S|M|L --request ~/tasks/<slug>.md   (file OUTSIDE the worktree)
-       → install probes and pre-start probes (§8); any failure: prints the fix, registers nothing, no clock
+You, in a terminal (or an agent session you ask to, with your tier and your text):
+  1. In the project's main checkout (2a §15):
+     harness start --new <slug> --benchmark-tier S|M|L --request ~/tasks/<slug>.md [--agent NAME]
+                                                          (file OUTSIDE any checkout)
+       → the task's agent: --agent, else the running agent, else the one found agent
+       → git fetch; install probes, not-cloud probe, uniqueness check (§8); then
+         git worktree add <parent>/worktrees/<project>/<agent>/<task-id> -b <task-id> <remote>/<default>
+       → in the new worktree: pre-start probes (§8); any failure: prints the fix, removes the worktree
+         and branch it made, registers nothing, no clock
        → passes: mints <date>-<slug>, creates .harness/runs/<task-id>/ (request.md verbatim,
          state.json), records assignment (arm "baseline", assigned commit = harness repo HEAD),
-         appends `start` (clock starts), prints the harness checkout path
-Launch an agent IN THAT WORKTREE: claude / codex CLI, or open the folder in either app.
+         appends `start` (clock starts; no session, agent = the task's agent), prints the worktree path
+     In a linked worktree you made yourself (git worktree add <path> -b <branch> origin/main; cd <path>),
+     the same command, without --agent, registers in place.
+Launch the agent IN THAT WORKTREE right away: claude / codex CLI, or open the folder in either app. The
+session that registered never works on the task.
 Codex must be launched with full access (`-s danger-full-access`, or the app's full-access setting).
-  3. Bootstrap: the agent runs `harness start`
+  2. Bootstrap: the agent runs `harness start`
        → resolves the task by branch, runs doctor (session probe, install probes, not-cloud probe), appends `resume`, prints the task's phase (H2) and the checkout
-  4. The agent reads AGENTS.md from that checkout → `harness phase triage enter` → … → `harness pr`
+  3. The agent reads AGENTS.md from that checkout → `harness phase triage enter` → … → `harness pr`
 ```
 
-- **Bootstrap** (`hooks/bootstrap.md`, fixed): "If another agent launched you, ignore this file and
+- **Bootstrap** (`hooks/bootstrap.md`, fixed): "If another agent launched you, ignore these instructions and
   follow your prompt. Otherwise run `harness start`, then read `AGENTS.md` from the checkout it
   prints. If `harness start` fails or is refused in a repository that has `.harness/project.json`, stop
   and tell the user: never work on a harness task without it." (The stop rule: gap #27.) Tested: Claude and Codex both ran a "run this first" instruction before the user's request.
+  2a adds: "To start a new harness task for the user, run `harness start --new` in the project's main
+  checkout with the user's tier (ask if they gave none) and the user's request text verbatim, saved outside
+  any checkout; it creates the task's worktree and says where to open the next session." The installed
+  copies are `~/.claude/harness-bootstrap.md` and a marked block in `$CODEX_HOME/AGENTS.md`.
 - **Silence outside harness work:** `harness start` exits silently (no output, exit 0) in a repo
   without `.harness/project.json` or on a branch with no task. Hook handlers exit silently only in a
   repo without `.harness/project.json`; in a harness project they always append (any branch,
@@ -454,7 +469,7 @@ branch resolution unambiguous. Hooks never resolve at write time, so they stay f
   variable (`CODEX_THREAD_ID`) if one is present, else the payload's `session_id`. The Claude hook
   adapter derives `parent_session` the same way. Tested: these reach Bash commands, child processes and subagents,
   survive `cd`, and a Codex process launched with them passes them to its hooks and commands. Codex has
-  no equivalent, so its children link by branch when they run in the task's worktree.
+  no equivalent; its children are found in the event log (below).
 - **Identity in commands.** Claude: `HARNESS_SESSION_ID` (not `CLAUDE_CODE_SESSION_ID`, which may hold
   the startup id after `claude --continue`). Codex: `CODEX_THREAD_ID` (tested equal to the hook's
   `session_id`). Each future adapter names its own identity variable.
@@ -465,8 +480,17 @@ branch resolution unambiguous. Hooks never resolve at write time, so they stay f
   agent `claude`, parent P). A non-delegate's id is the single value its identity variables agree on;
   if they disagree and `HARNESS_PARENT_SESSION` is unset, the command refuses as ambiguous.
   A delegate may run `harness check` (including `--observed`); `harness start` in a delegate appends
-  nothing and prints "delegate of task <id>: follow your prompt"; `harness phase`, `review` and `pr`
-  refuse. This keeps one owner per task record; it does not limit how agents organize work.
+  nothing and prints "delegate of task <id>: follow your prompt (parent session <P>)"; `harness phase`,
+  `review`, `rebase`, `pr` and `close` refuse. This keeps one owner per task record; it does not limit how
+  agents organize work.
+- **Helpers found in the event log** (2a §7). The Codex hook records `parent_session` as
+  `HARNESS_PARENT_SESSION` if set, else an inherited `CODEX_THREAD_ID` that differs from the payload's
+  `session_id`, else that `session_id`. In commands, when a session has an identity, its environment marks it a
+  non-delegate and no `HARNESS_PARENT_SESSION` is set, the project's spool decides: (1) the session's latest
+  `session_start` names another `parent_session`, or (2) a `subagent_start` names the session as its
+  `agent_id`; either makes it a delegate of that parent. Recognized launches: Claude → Claude and Claude →
+  Codex by the markers; Codex → Claude by the inherited `CODEX_THREAD_ID`; Codex → its built-in subagents
+  by rule 2; Codex → `codex exec` by rule 1.
 - **Controlling session.** `harness phase <p> enter` records the issuing session as controller (a
   successor after a handoff takes over this way). Commands you run by hand with no agent identity
   (`pr --refresh`, a manual `phase build enter`) record null.
@@ -512,15 +536,15 @@ retroactively for every task recorded since its raw data started.
 
 | Metric | Role | Raw data | Recorded from | Computed from |
 |---|---|---|---|---|
-| Wall time | **Score** | `start`, `phase`, `resume`, `review`, `ready`, `close` events | Slice 1 (`review` from Slice 2) | Slice 1 |
+| Wall time | **Score** | `start`, `phase`, `resume`, `review`, `ready`, `close` events | Slice 1 (`review` from Slice 2b) | Slice 1 |
 | Not done | Guardrail | Gate inputs, `close`, deadlines, expiry | Slice 1 | Slice 1 |
-| Tier upgrade | Guardrail | `config.json` `origin_tier`/`tier`; `tier` events | Slice 1 (triage); `tier` from Slice 2 | Slice 3 |
-| Escaped defects | Guardrail | `defect` events | Slice 2 | Slice 3 |
+| Tier upgrade | Guardrail | `config.json` `origin_tier`/`tier`; `tier` events | Slice 1 (triage); `tier` from Slice 2b | Slice 3 |
+| Escaped defects | Guardrail | `defect` events | Slice 2b | Slice 3 |
 | Rework | Diagnostic | `check` events | Slice 1 | Slice 3 |
 | Discovery lag | Diagnostic | Unknown lines in `plan.md` vs `plan.approved.md`; verify-phase Unknowns | Slice 1 | Slice 3 |
 | Plan churn | Diagnostic | Milestones in `plan.md` vs `plan.approved.md` | Slice 1 | Slice 3 |
 | Cost: agent time | Diagnostic | Hook prompt/stop/subagent events | Slice 1 | Slice 1 |
-| Cost: tokens, dollars | Diagnostic | Transcript paths (Slice 1); cached totals | Slice 1 (paths); cache from Slice 2 | Slice 3 |
+| Cost: tokens, dollars | Diagnostic | Transcript paths (Slice 1); cached totals | Slice 1 (paths); cache from Slice 2b | Slice 3 |
 | Topology | Descriptive | Session, helper, parent events; transcripts | Slice 1 | Slice 3 |
 
 ---
@@ -529,11 +553,11 @@ retroactively for every task recorded since its raw data started.
 
 | Command | Run by | Does | Refuses when | Slice |
 |---|---|---|---|---|
-| `install --user` | You | User-scope install (§4.3) | `AGENTS.override.md` in `$CODEX_HOME` | 1 (Codex parts 2) |
+| `install --user` | You | User-scope install (§4.3), for the agents found | `AGENTS.override.md` in `$CODEX_HOME` | 1 (Codex parts 2a) |
 | `install` | You | Project files on a branch | Not a git repo | 1 |
-| `doctor` | Anyone | Install, pre-start and session probes (§8), read-only | — | 1 (Codex checks 2) |
-| `start --new <slug> --benchmark-tier T --request F` | You | §4.4 step 2; holds the spool lock across uniqueness check, assignment and `start` | An install or pre-start probe fails | 1 |
-| `start` | Bootstrap | Resolve task, install probes, not-cloud probe, session probe, `resume`, print checkout | (silent no-op outside a task; delegates: prints delegate notice) | 1 |
+| `doctor` | Anyone | Install, pre-start and session probes (§8), read-only | — | 1 (Codex checks 2a) |
+| `start --new <slug> --benchmark-tier T --request F [--agent NAME]` | You, or a session you ask to, with your tier and your text | §4.4 step 1: in the main checkout it first creates the task's worktree (2a §15); in a linked worktree it registers in place; holds the spool lock across uniqueness check, assignment and `start` | An install or pre-start probe fails; `--agent` outside the main checkout, an unknown agent, or no single agent to infer | 1 (worktrees 2a) |
+| `start` | Bootstrap | Resolve task, install probes (its own agent's), not-cloud probe, session probe, `resume`, print checkout | (silent no-op outside a task; delegates: prints the delegate notice naming the parent) | 1 |
 | `phase <name> enter\|exit [--handoff]` | Controlling session (you for manual build enter) | Phase event; first `build enter` snapshots `plan.approved.md` | Default branch; delegate; triage without a passing session probe; `plan.md` without a goal or usable checks (every command but `triage enter`, H10) | 1 |
 | `check [--task ID] <C-id>\|--all [--observed pass\|fail]` | Any session or delegate | Runs the check's fenced command from `plan.md` (or records an observation); code tree and check-text hash | Code checkout not clean outside `.harness/` before or after; after `ready` or a handoff exit, until a phase enter (H5) | 1 |
 | `rebase` | Build phase; `pr --refresh` | Commit `.harness/`, fetch (retry on lock), `rebase --merge`, by-id memory cleanup, conflict rerun flow (parent) | Uncommitted changes outside `.harness/` (unless a rebase it started is stopped) | 1 (memory cleanup 2) |
@@ -541,7 +565,7 @@ retroactively for every task recorded since its raw data started.
 | `pr --refresh <task-id>` | You (the agent when `merge` is `agent`, H4) | `build enter`, `rebase`, `check --all`, force-with-lease push, re-emit `ready`; on conflict: abort and `build exit`; observational checks owed at the rebased code: PR body 'not ready', `build exit --handoff` (H5) | — | 1 |
 | `close <task-id> --done\|--abandon` | You | Disposition event | — | 1 |
 | `score` | You | §10 | — | 1 (full metrics 3) |
-| `hook <agent> <event>` | Hook entries | Adapter → spool | (never fails the agent) | 1 (Codex 2) |
+| `hook <agent> <event>` | Hook entries | Adapter → spool | (never fails the agent) | 1 (Codex 2a) |
 | `tier <S\|M\|L>` | Any controlling session | Rewrites tier in `plan.md` and `config.json`, keeps `origin_tier`, appends `tier`, copies files to the state dir | Downgrade | 2 |
 | `review start\|end` | Controlling session | Brackets a human plan review | — | 2 |
 | `retro-bundle` | Retro phase | Prints the bundle (C12) | — | 2 |
@@ -568,9 +592,12 @@ writability, `harness` on PATH, `project.json` validity, `.gitattributes`, the a
 
 | Probe set | Checks |
 |---|---|
-| Install probes | Claude: hook entries present and enabled (`disableAllHooks` not true); bootstrap import present. Codex (Slice 2): hook entries present; `[features].hooks` not false; a `hooks.state` approval for each harness hook entry; the state dir in `[sandbox_workspace_write].writable_roots`; bootstrap block present; no `$CODEX_HOME/AGENTS.override.md` |
+| Install probes | Per agent found on the machine (2a §4); `harness start` in an agent session probes only its own agent. Claude: hook entries present and enabled (`disableAllHooks` not true); bootstrap import present. Codex (2a §8): `codex_hooks` (a harness group per event; `[features].hooks` not false), `codex_hooks_trusted` (a `hooks.state` entry with a hash for each harness hook, keyed by the resolved `hooks.json` path), `codex_writable_root`, `codex_bootstrap`, `codex_no_override` (no `$CODEX_HOME/AGENTS.override.md`), `codex_full_access` (a Codex command's environment has neither `CODEX_SANDBOX` nor `CODEX_SANDBOX_NETWORK_DISABLED`) |
 | Pre-start probes | Not a cloud session; on a task branch (inside a git worktree, not the default branch); `git status --porcelain` empty; started from the fetched integration branch (`git fetch` of the integration ref succeeds, no commits outside it); branch name and task id never used (integration branch, this branch, spool) |
-| Session probe (live) | This session's own hook events reached the spool in the last few minutes, matched by its identity (§6.9), which must be present; Codex: `CODEX_SANDBOX` unset (full access) |
+| Session probe (live) | This session's own hook events reached the spool in the last few minutes, matched by its identity (§6.9), which must be present (Codex full access is the install probe `codex_full_access`) |
+
+In the main checkout, `harness doctor` says that `harness start --new` there creates the task's worktree
+and that the pre-start checks apply there; only the install group sets its exit code (2a §15).
 
 A failure in `start --new` registers nothing. A failure in the session probe stops the agent before
 triage with the fix printed; the task stays in flight and its clock keeps running; you fix and relaunch.
@@ -631,12 +658,13 @@ next starts.
 |---|---|---|---|
 | **Phase 0** (short) | Capture hook-payload fixtures from both agents in a throwaway repo; a temporary logging hook loaded per run (`claude -p --settings`) for the payload capture (removed afterwards); the desktop-app hook check by evidence from a desktop session (`install --user` is first exercised in Slice 1); confirm Claude desktop and Codex app sessions run the user-level hooks; confirm `git hash-object -t tree` runs inside a sandboxed `codex exec` | — | Each item confirmed, or its fallback chosen and written into this spec |
 | **Slice 1: one measured task (Claude)** | Spool, event schema v1, Claude adapter, `install`, `doctor` (install, pre-start and session probes, Claude), `start`, `phase`, `check`, `rebase` (no memory cleanup), `pr`, `pr --refresh`, `close`, `score` (resolution, gate, timing, agent time, coverage); phase files triage, research, resolve, plan, build, verify; `AGENTS.md` | Every raw input in §6.12 except `tier`, `defect` and harness memory events | One real mvp M task merged with a complete scorecard (all boundaries present, gate evaluated, no unexplained orphans); two tasks in parallel in mvp scored correctly |
-| **Slice 2: both agents, all phases (ready for real work)** | Codex adapter and install (hooks, approval step, writable root, bootstrap); retro phase, `retro-bundle`, harness memory, `memory`, `rebase` by-id cleanup; `tier`, `review`, `defect`; transcript cache | Everything in §6.12 | Claude and Codex tasks running concurrently in mvp; at least one echo-wiki task; a Claude task whose verify ran in a Codex delegate, with the delegate's check recorded; two parallel tasks' lessons merged cleanly; scorecards complete for all |
+| **Slice 2a: Codex agents** (2a spec) | Codex adapter and install (hooks, trust step, writable root, bootstrap); found agents; helpers found in the event log; Logbook Codex reader and token-only cost; task worktrees from `start --new` in the main checkout | Codex sessions with every raw input Slice 1 records | 2a §11: P1 Claude and Codex tasks running concurrently in mvp; P2 a Claude task whose verify ran in a Codex delegate, with the delegate's check recorded; P3 a Codex task's `codex exec` helper recorded as a delegate; P4 one echo-wiki Codex task; P5 a desktop-app session; P6 every proof task registered from the main checkout; Logbook pages for all; pre-2a scorecards unchanged |
+| **Slice 2b: all phases (ready for real work)** | Retro phase, `retro-bundle`, harness memory, `memory`, `rebase` by-id cleanup; `tier`, `review`, `defect`; transcript cache | Everything in §6.12 | Two parallel tasks' lessons merged cleanly; scorecards complete for all |
 | **Slice 3: full scorecard** | All seven metrics, tokens and dollars, topology rebuild, summary with spread per tier, note-line validation | — | Scorecards recomputed for every task since Slice 1; three tasks hand-checked against the scorer |
 | **v1: comparisons** | §2.3 first row | — | Parent design's Fair comparison rules |
 | **Later** | Cloud, classifier, wrapper skill, more adapters | — | — |
 
-**Ready for real work** is the end of Slice 2: from then on every task records all raw data the parent's
+**Ready for real work** is the end of Slice 2b: from then on every task records all raw data the parent's
 benchmarking needs, and Slice 3 computes the remaining metrics retroactively. Slice 1 tasks lack retro
 spans and memory events; they prove the instrumentation and stay outside any v1 comparison anyway.
 
@@ -652,7 +680,7 @@ spans and memory events; they prove the instrumentation and stay outside any v1 
   two branches; `rebase` conflict stop and rerun; `pr` and `pr --refresh` against a local bare remote
   with a stubbed `gh`; gate across merge, squash and rebase merges.
 - **Adapter contract:** real Claude and Codex hook payloads from throwaway sessions (Claude captured in
-  Phase 0, 2026-10-09; Codex captured at the start of Slice 2; the 2026-10-08 captures were not kept and
+  Phase 0, 2026-10-09; Codex captured in Phase 0b, 2026-10-16; the 2026-10-08 captures were not kept and
   §16 lists their fields), stored as fixtures; a changed
   payload must produce a `format_warning`, never a crash. Remove the trust entries `codex exec` adds for
   throwaway folders afterwards (§16).
@@ -680,9 +708,9 @@ to a file in a writable root; after `claude --resume`, SessionStart fires again 
 
 | Unknown | Safety net |
 |---|---|
-| Whether the Codex desktop app runs user-level hooks | Not checked in Phase 0; deferred to the start of Slice 2 with the Codex adapter. At runtime the session probe fails before triage if this session's hooks never reach the spool |
+| Whether the Codex desktop app runs user-level hooks | Not checked in Phase 0 or Phase 0b (no desktop app in either run); checked by 2a's proof task P5 (2a §10, "Left for P5"). At runtime the session probe fails before triage if this session's hooks never reach the spool |
 | Whether a user-level hook entry runs in the Claude desktop app, and its hook-process `PATH` | Phase 0 (2026-10-09): plugin SessionStart hooks fired in a desktop-app Code-tab session, so hooks run; a user-level entry was not exercised and the hook-process `PATH` was not captured (hook entries use absolute paths). The session probe is the net |
-| Codex hook payload fixtures | Not captured in Phase 0 (the permission classifier refused a full-access `codex exec` that bypasses hook trust); deferred to the start of Slice 2. Slice 1 is Claude-only |
+| Codex hook payload fixtures | Closed by Phase 0b (2026-10-16, §16): all six events captured from `codex exec` against a local mock model on Codex 0.163.0 (Linux) and 0.160.0 (macOS), committed as lean-harness `tests/fixtures/codex/` |
 | `git hash-object -t tree` inside a seatbelt sandbox | Phase 0 (2026-10-09): confirmed. Inside `codex exec -s workspace-write` (`CODEX_SANDBOX=seatbelt`) it exits 0 and the hash matches `HEAD^{tree}`; no fallback needed |
 | Transcript formats change | Readers are best-effort; fields go null and coverage drops; nothing else depends on them |
 
@@ -694,7 +722,7 @@ to a file in a writable root; after `claude --resume`, SessionStart fires again 
 |---|---|
 | Hands-off assumptions compound, the evaluator approves weak work, a wrong lesson spreads, memory fills with noise, a lean config under-plans | Parent's guardrails, unchanged |
 | Native agent memory blurs differences between harness versions | Accepted (C1) |
-| Nested delegation across agents more than one level deep records the top session as parent | Exact chain reconstructable from transcripts |
+| Nested delegation across agents more than one level deep records the top session as parent; commands of the innermost session refuse as ambiguous | Exact chain reconstructable from transcripts |
 | Children launched by a Codex session outside the task's worktree are unlinked | Listed as orphans; transcripts hold the link |
 | Concurrent tasks share machine, test slots and provider quotas | Disclosed, as in the parent |
 | Operator knows the arm (v1) | Disclosed, as in the parent |
@@ -702,6 +730,17 @@ to a file in a writable root; after `claude --resume`, SessionStart fires again 
 | The per-machine state directory is lost | Back it up with the machine |
 | Rebase merges: a commit added after the last `ready` is not seen by the gate | Use squash or merge commits (harness `docs/project-setup.md`); the gate stays forge-free (§9.8) |
 | `merge: agent` in a repository with a merge queue: `gh pr merge` may enable auto-merge | Not supported; the printed rule excludes it |
+| (2a) Codex changes fast (inline `[hooks]` in `config.toml` and async hooks are recent) | `tests/smoke/codex_facts.py` re-checks a new version in minutes; unknown payloads warn, never crash; doctor reports drift |
+| (2a) The Codex desktop app may not send `SessionEnd`, or the `SessionEnd` hook outlives Codex's 3 s cap | The controller-end pause (H3) does not apply to that session; the clock keeps running until the next `harness` command. Disclosed on the scorecard by the missing `session_end` |
+| (2a) Uninstall can move the user's own Codex hooks | It lists them so the user re-trusts them |
+| (2a) A Codex helper not recognized (a later Codex version breaks rule 1 before the fallback ships) | It looks like a main session. Sandboxed, `codex_full_access` fails and it cannot take control; with full access it can pass `harness start` and become controller; the Logbook shows the controller change |
+| (2a) A Codex session started from a shell that inherited an unrelated session's `CODEX_THREAD_ID` | Rule 1 makes it a delegate of that session; `harness start` names the parent, so the user relaunches from a clean shell |
+| (2a) Time from registration to the first `harness start` in the new worktree, and project setup done there, is charged | Register only when the agent is about to open; `start --new` says so when it prints the path |
+| (2a) Every `start --new` is blocked until a newly found agent is installed and trusted | Loud by design; the fix is printed |
+| (2a) Agent sessions that register from the main checkout leave their hook events on the default branch | Counted as events tied to no task on the Logbook's project page; scorecards unaffected |
+| (2a) A Codex built-in subagent that runs `harness check` appears twice in the Logbook: as a helper span and as a delegate session | Cosmetic; both are correct records of one helper |
+| (2a) A Codex session that registers in the main checkout and then works in the worktree is recorded on the default branch | Its hook events are orphans and its end never pauses the clock; the scorecard shows both. Not enforced |
+| (2a) Codex dollars unknown | Tokens recorded; dollar totals exclude token-only sessions and say so |
 
 ---
 
@@ -769,18 +808,36 @@ this evidence came from a desktop session whose bundled Claude Code was 2.1.293 
 The agent's Bash `PATH` contains `~/.local/bin`, and `python3.12` resolves to
 `/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12`. A user-level hook entry was not
 exercised and the hook-process `PATH` was not captured, so hook entries call the dispatcher by absolute
-path. Codex app: not checked, deferred to Slice 2.
+path. Codex app: not checked, deferred to 2a's proof task P5.
 `git hash-object -t tree --stdin` (no `-w`) inside a sandboxed `codex exec -s workspace-write`
 (`CODEX_SANDBOX=seatbelt`): exit 0, hash equals `HEAD^{tree}`. The harness uses `git hash-object`.
+
+**Phase 0b (2026-10-16; 2a §10).** `tests/smoke/codex_facts.py` ran `codex exec` in a throwaway
+`$CODEX_HOME` against a local mock model (no account, no network) on Codex 0.163.0 (Linux container) and
+0.160.0 (macOS 27.0, Python 3.12.8, git 2.54.0). `hooks.json` is `{"hooks": {"<Event>": [{"matcher"?,
+"hooks": [{"type": "command", "command", "timeout"?}]}]}}` and all six events fire; no hook carries
+`effort` (the session log's `turn_context` does). Trust keys are `<absolute, symlink-resolved hooks.json
+path>:<event_snake_case>:<group>:<handler>` with `trusted_hash` (not derivable) and `enabled`; a bare
+`hooks.json:…` key is not honored. A `codex exec` launched from a Codex shell: its hook processes inherit
+the parent's `CODEX_THREAD_ID`, while its payload and shell carry its own id. A built-in subagent: its
+events carry the parent `session_id` and `agent_id` = its thread id, which its shell sees as
+`CODEX_THREAD_ID`; it fires `UserPromptSubmit` with that `agent_id`; `SubagentStart.transcript_path` is the
+subagent's own log. Hook processes never see their own session's `CODEX_THREAD_ID`. The `SessionEnd` hook
+timeout defaults to 1 s and is clamped to 3 s. Sandboxed shells carry `CODEX_SANDBOX=seatbelt` on macOS
+and only `CODEX_SANDBOX_NETWORK_DISABLED` on Linux; hook `permission_mode` is not a sandbox signal.
+Session logs hold `session_meta`, `turn_context` (`model`, `effort`), tool calls (`exec_command` with
+`cmd`; an `apply_patch` run through it is intercepted and answered `Exit code: N`) and cumulative
+`token_count` totals, no dollars.
 
 ---
 
 ## 17. Daily use
 
-1. Write the task in a file outside the worktree. Create a worktree from fresh `origin/main`.
-2. In the worktree, right before launching the agent (the clock starts here):
-   `harness start --new <slug> --benchmark-tier S|M|L --request <file>`.
-3. Open Claude or Codex (Codex with full access) in that worktree; it bootstraps itself.
+1. Write the task in a file outside any checkout.
+2. In the project's main checkout, right before launching the agent (the clock starts here):
+   `harness start --new <slug> --benchmark-tier S|M|L --request <file> [--agent claude|codex]`. It creates
+   the worktree at `<parent>/worktrees/<project>/<agent>/<task-id>` and prints it.
+3. Open that agent (Codex with full access) in the printed worktree; it bootstraps itself.
 4. Answer questions when asked; stops and resumes are fine (any number of sessions).
 5. When the PR is ready: review it; run `harness pr --refresh <task-id>`; merge as soon as its checks
    pass. If `main` moves first, refresh again. Never use GitHub's "Update branch" button: it changes the

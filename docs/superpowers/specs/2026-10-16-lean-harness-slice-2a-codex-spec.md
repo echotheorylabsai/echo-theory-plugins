@@ -91,7 +91,7 @@ logbook ──► READERS: claude → read_claude_log, codex → read_codex_log 
 |---|---|
 | `harness/adapters/codex.py` | **New.** `NAME = "codex"`, `IDENTITY_VAR = "CODEX_THREAD_ID"`, `RUNNING_VAR = "CODEX_THREAD_ID"`, `to_event`, `on_event` (no-op: Codex has no env file), `found`, `install_user`, `uninstall_user`, `doctor_probes` |
 | `harness/adapters/__init__.py` | Register `codex`; add `found(home, env)` per adapter (Codex's home can come from `$CODEX_HOME`). `identity_vars` and `foreign_vars` are unchanged in code, but their results now include `codex`, which activates v0 §6.9's cross-agent rows for the first time (§7) |
-| `harness/adapters/claude.py` | Add `found(home, env)` (§4) and `RUNNING_VAR = "CLAUDECODE"` (§15) only |
+| `harness/adapters/claude.py` | Add `found(home, env)` (§4) and `RUNNING_VAR = "CLAUDECODE"` (§15), and an ignored `env=None` parameter on `install_user`/`uninstall_user` only |
 | `install`, `uninstall`, `doctor`, `start` | Loop over found agents; an agent session's `harness start` probes only its own agent (§4) |
 | `harness/commands/start.py`, `harness/commands/doctor.py` | `start --new` in the main checkout creates the task worktree; new optional `--agent`; doctor's main-checkout hint names it (§15) |
 | `harness/context.py` | Event-log helper lookup when no parent marker is present (§7) |
@@ -139,7 +139,7 @@ so `start --new` fails with "run `harness install --user`". That is the intended
 - **Refuses** if `$CODEX_HOME/AGENTS.override.md` exists (it replaces `AGENTS.md`, so the bootstrap would
   never load). Each adapter's changes are printed before the next adapter runs, so Claude's changes from
   the same run are shown and stand; remove the file and rerun (idempotent).
-- **Prints the one manual step:** open Codex, run `/hooks`, and trust the harness hooks. The harness never
+- **Prints the one manual step** (when it added hook groups): open Codex, run `/hooks`, and trust the harness hooks. The harness never
   writes trust entries itself.
 - **`uninstall --user`** removes only the harness hook groups, the marked block and the writable root
   (backup first). If any of the user's hook groups sit after a harness group in the same event, it lists
@@ -258,7 +258,8 @@ list (joined with `shlex.join`); `apply_patch` (writes to harness-owned paths: i
 File:` paths are checked against the harness-owned paths), as an `exec_command` whose `cmd` starts with
 `apply_patch` (the recorded 0.163 shape: Codex intercepts it and answers `Exit code: N`), a shell argv
 whose first word is `apply_patch`, or a custom tool call; `spawn_agent` (helper launches); `turn_context`, `token_count` and
-`session_meta`. Every other tool call counts as not inspected (the Claude reader's existing rule). A
+`session_meta`. Every other tool call counts as not inspected (the Claude reader's existing rule), and `write_stdin`
+with text counts as a shell call the reader cannot inspect. A
 command's outcome comes from its `function_call_output` text ("Process exited with code N", or "Exit code:
 N" for an intercepted `apply_patch`: 0 done, else failed); a call without one is `no_result`. The reader
 also returns `effort` (the last `turn_context.effort`), which the Logbook shows when the records carry
@@ -447,14 +448,14 @@ git dir equals the git common dir, whatever branch it has checked out. There:
 1. **Agent:** `--agent NAME` if given (an adapter name); else the one adapter whose `RUNNING_VAR` is set in
    the environment (Claude Code sets `CLAUDECODE=1` in its shells; Codex sets `CODEX_THREAD_ID`); else the
    one found agent (§4); none or several → refuse: "pass --agent claude|codex".
-2. **Before creating anything:** install probes (every found agent), the not-cloud probe, and the
+2. **Before creating anything** (after fetching the integration branch): install probes (every found agent), the not-cloud probe, and the
    uniqueness check run for branch `<task-id>` (no `start` event with that task id or branch in the spool,
    no remote branch `<task-id>`, no `runs/<task-id>` on the integration ref). An existing local path or
    branch is refused by git itself; the refusal adds "if no task <id> is registered:
    `git worktree remove --force <path>`; `git branch -D <task-id>`", which clears what an interrupted run
    leaves.
-3. `git fetch` the integration branch; `git worktree add <parent>/worktrees/<project>/<agent>/<task-id>
-   -b <task-id> <remote>/<default>`.
+3. `git worktree add <parent>/worktrees/<project>/<agent>/<task-id> -b <task-id> <remote>/<default>`, from
+   that fetch.
 4. Register inside the new worktree as today (pre-start probes there, the locked uniqueness check — the
    authority —, task folder, `start` event), except that the `start` event carries no session identity
    (`session_id` and `parent_session` null) and `agent` = the task's agent from step 1: the existing
